@@ -556,7 +556,7 @@
 
 
     // ====================================================================
-    // --- 3. GAS COMMUNICATION FUNCTIONS ---
+    // --- 3. GAS COMMUNICATION FUNCTIONS --- (FIX BUG 1: Tambahkan Retry Logic)
     // ====================================================================
 
     async function fetchData(endpointUrl) {
@@ -565,40 +565,51 @@
             showModal('Error Konfigurasi', 'WEB_APP_URL harus diisi. Harap ganti placeholder "" dengan URL Web App Anda yang berakhiran /exec.', 'error', 5000);
             return null;
         }
-
-        try {
-            const response = await fetch(endpointUrl, {
-                method: 'GET',
-                mode: 'cors' 
-            });
-            
-            const text = await response.text();
-            
-            if (text.trim().startsWith('<')) {
-                return { status: 'error', message: 'Apps Script Server Crash: Server mengembalikan kode HTML (bukan JSON/Text). Ini sering disebabkan oleh kode Apps Script yang gagal, misalnya SPREADSHEET_ID salah, nama Sheet tidak ditemukan, atau API Google ditolak.' };
-            }
-
+        
+        const MAX_RETRIES = 3;
+        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
             try {
-                const result = JSON.parse(text);
-                if (result.status === 'error' && result.message.includes('Aksi tidak dikenali.')) {
-                    const specificError = `Error: ${result.message} Anda perlu melakukan REDEPLOY ULANG Google Apps Script sebagai VERSI BARU setelah menambahkan kode fungsi 'getStudentHistory(e)' dan 'getComparisonData(e)' ke file Code.gs.`;
-                    return { status: 'error', message: specificError };
+                const response = await fetch(endpointUrl, {
+                    method: 'GET',
+                    mode: 'cors' 
+                });
+                
+                const text = await response.text();
+                
+                if (text.trim().startsWith('<')) {
+                    // This error indicates a server crash or a redirection, often due to an invalid SPREADSHEET_ID in Apps Script.
+                    throw new Error('Apps Script Server Crash: Server mengembalikan kode HTML (bukan JSON/Text).');
                 }
-                return result;
-            } catch (e) {
-                if (text.includes('Absensi berhasil disimpan.') || text.includes('Pembaruan nilai berhasil.')) {
-                    return { status: 'success', message: text };
+
+                try {
+                    const result = JSON.parse(text);
+                    if (result.status === 'error' && result.message.includes('Aksi tidak dikenali.')) {
+                        const specificError = `Error: ${result.message} Anda perlu melakukan REDEPLOY ULANG Google Apps Script sebagai VERSI BARU setelah menambahkan kode fungsi terkait ke file Code.gs.`;
+                        throw new Error(specificError);
+                    }
+                    return result; // Success, break out of loop
+                } catch (e) {
+                    if (text.includes('Absensi berhasil disimpan.') || text.includes('Pembaruan nilai berhasil.')) {
+                        return { status: 'success', message: text };
+                    }
+                    if (text.startsWith('Error:')) {
+                        throw new Error(text);
+                    }
+                    throw new Error('Respon server tidak terduga, bukan JSON: ' + text);
                 }
-                if (text.startsWith('Error:')) {
-                    return { status: 'error', message: text };
+            } catch (error) {
+                if (attempt < MAX_RETRIES - 1) {
+                    console.warn(`Fetch GET attempt ${attempt + 1} failed. Retrying in ${2 ** attempt}s...`, error);
+                    // Implement exponential backoff
+                    await new Promise(resolve => setTimeout(resolve, (2 ** attempt) * 1000));
+                } else {
+                    // Final attempt failed
+                    console.error('Fetch/CORS Error:', error);
+                    const errorMessage = `Gagal terhubung ke server Apps Script (Network/CORS Error) setelah ${MAX_RETRIES} kali percobaan. Pastikan Web App Anda: 1) URL berakhiran /exec sudah benar, 2) Akses disetel "Anyone" (Siapa saja) saat di-deploy, dan 3) Sudah di-REDEPLOY sebagai VERSI BARU. Error Terakhir: ${error.message.substring(0, 100)}...`;
+                    showModal('Koneksi Gagal (Retry Failed)', errorMessage, 'error', 7000); 
+                    return { status: 'error', message: errorMessage };
                 }
-                return { status: 'error', message: 'Respon server tidak terduga, bukan JSON: ' + text };
             }
-        } catch (error) {
-            console.error('Fetch/CORS Error:', error);
-            const errorMessage = 'Gagal terhubung ke server Apps Script (Network/CORS Error). Pastikan Web App Anda di Apps Script: 1) URL berakhiran /exec sudah benar, 2) Akses disetel "Anyone" (Siapa saja) saat di-deploy, dan 3) Sudah di-REDEPLOY sebagai VERSI BARU.';
-            showModal('Koneksi Gagal', errorMessage, 'error', 7000); 
-            return { status: 'error', message: errorMessage };
         }
     }
 
@@ -608,36 +619,45 @@
             showModal('Error Konfigurasi', 'WEB_APP_URL harus diisi. Harap ganti placeholder "" dengan URL Web App Anda yang berakhiran /exec.', 'error', 5000);
             return { status: 'error', message: 'WEB_APP_URL belum diatur.' };
         }
-
-        try {
-            const response = await fetch(WEB_APP_URL, {
-                method: 'POST', mode: 'cors', body: payload,
-            });
-
-            const text = await response.text();
-            
-            if (text.trim().startsWith('<')) {
-                return { status: 'error', message: 'Apps Script Server Crash: Server mengembalikan kode HTML (bukan JSON/Text). Ini sering disebabkan oleh kode Apps Script yang gagal, misalnya SPREADSHEET_ID salah, nama Sheet tidak ditemukan, atau API Google ditolak.' };
-            }
-
+        
+        const MAX_RETRIES = 3;
+        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
             try {
-                const result = JSON.parse(text);
-                return result;
-            } catch (e) {
-                if (text.includes('Absensi berhasil disimpan.') || text.includes('Pembaruan nilai berhasil.') || text.includes('Data siswa baru berhasil ditambahkan.') || text.includes('siswa telah dihapus berdasarkan filter')) {
-                    return { status: 'success', message: text };
-                }
-                if (text.startsWith('Error:')) {
-                    return { status: 'error', message: text };
-                }
-                return { status: 'error', message: 'Respon POST tidak terduga, bukan JSON: ' + text };
-            }
+                const response = await fetch(WEB_APP_URL, {
+                    method: 'POST', mode: 'cors', body: payload,
+                });
 
-        } catch (error) {
-            console.error('Fetch/CORS Error:', error);
-            const errorMessage = 'Gagal mengirim data ke server Apps Script (Network/CORS Error). Pastikan Web App Anda di Apps Script: 1) URL berakhiran /exec sudah benar, 2) Akses disetel "Anyone" (Siapa saja) saat di-deploy, dan 3) Sudah di-REDEPLOY sebagai VERSI BARU.';
-            showModal('Koneksi Gagal', errorMessage, 'error', 7000);
-            return { status: 'error', message: errorMessage };
+                const text = await response.text();
+                
+                if (text.trim().startsWith('<')) {
+                    throw new Error('Apps Script Server Crash: Server mengembalikan kode HTML (bukan JSON/Text).');
+                }
+
+                try {
+                    const result = JSON.parse(text);
+                    return result; // Success, break out of loop
+                } catch (e) {
+                    if (text.includes('Absensi berhasil disimpan.') || text.includes('Pembaruan nilai berhasil.') || text.includes('Data siswa baru berhasil ditambahkan.') || text.includes('siswa telah dihapus berdasarkan filter')) {
+                        return { status: 'success', message: text };
+                    }
+                    if (text.startsWith('Error:')) {
+                        throw new Error(text);
+                    }
+                    throw new Error('Respon POST tidak terduga, bukan JSON: ' + text);
+                }
+            } catch (error) {
+                 if (attempt < MAX_RETRIES - 1) {
+                    console.warn(`Fetch POST attempt ${attempt + 1} failed. Retrying in ${2 ** attempt}s...`, error);
+                    // Implement exponential backoff
+                    await new Promise(resolve => setTimeout(resolve, (2 ** attempt) * 1000));
+                } else {
+                    // Final attempt failed
+                    console.error('Fetch/CORS Error:', error);
+                    const errorMessage = `Gagal mengirim data ke server Apps Script (Network/CORS Error) setelah ${MAX_RETRIES} kali percobaan. PASTIKAN: 1) URL /exec sudah benar, 2) Akses "Anyone" saat di-deploy, 3) Redeploy Versi Baru. Error Terakhir: ${error.message.substring(0, 100)}...`;
+                    showModal('Koneksi Gagal (Retry Failed)', errorMessage, 'error', 7000);
+                    return { status: 'error', message: errorMessage };
+                }
+            }
         }
     }
 
@@ -1046,7 +1066,7 @@
 
         messageDiv.classList.remove('hidden'); chartContainer.classList.add('hidden'); attendanceChartContainer.classList.add('hidden');
         
-        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-purple-500"></span></div><span class="ml-3 text-purple-600">Mengambil data perbandingan...</span></div>`;
+        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-purple-500"></span></div><span class="ml-3 text-purple-600">Mengambil data perbandingan...</span>`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
         const url = `${WEB_APP_URL}?action=getComparisonData&role=${currentUser.role}&nip=${currentUser.nip || ''}`;
@@ -1500,10 +1520,11 @@
                                 <table class="min-w-full divide-y divide-gray-200">
                                     <thead class="bg-yellow-100">
                                         <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">NISN</th>
-                                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Nama Siswa</th>
-                                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                                            <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Keterangan</th>
+                                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">NISN</th>
+                                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Nama Siswa</th>
+                                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Keterangan</th>
+                                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody id="student-list-body" class="bg-white divide-y divide-gray-200">
@@ -1566,9 +1587,10 @@
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-green-100">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">NISN</th>
-                                    <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Nama Siswa</th>
-                                    <th id="assessment-score-label" class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Nilai (0-100)</th>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">NISN</th>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Nama Siswa</th>
+                                    <th id="assessment-score-label" class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Nilai (0-100)</th>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody id="assessment-student-list-body" class="bg-white divide-y divide-gray-200">
@@ -1992,7 +2014,7 @@
 
 
             row.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     ${student.nisn}
                     <input type="hidden" name="nisn" value="${student.nisn}">
                     <input type="hidden" name="nama_${student.nisn}" value="${student.nama}">
@@ -2000,17 +2022,81 @@
                     <input type="hidden" name="jurusan_${student.nisn}" value="${jurusan}">
                     <input type="hidden" name="date" value="${date}">
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${student.nama}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${student.nama}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm">
                     ${statusSelect}
                 </td>
-                <td class="px-6 py-4 text-sm text-gray-500">
+                <td class="px-4 py-4 text-sm text-gray-500">
                     <textarea name="keterangan_${student.nisn}" rows="1" placeholder="Keterangan (jika Izin/Sakit)" class="w-full px-3 py-2 border rounded-md resize-none ${keteranganClass}" ${isKeteranganDisabled ? 'disabled' : ''}>${initialKeterangan}</textarea>
+                </td>
+                <!-- FIX BUG 2: Tombol Simpan Individual -->
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <button type="button" onclick="handleSingleManualAttendanceUpdate('${student.nisn}')" 
+                        class="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold py-1 px-3 rounded-lg shadow-md transition duration-150 flex items-center">
+                        <span data-lucide="save" class="w-4 h-4 mr-1"></span> Simpan
+                    </button>
                 </td>
             `;
             body.appendChild(row);
         });
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
+
+    async function handleSingleManualAttendanceUpdate(nisn) {
+        const form = document.getElementById('manual-attendance-submit-form');
+        if (!form) return;
+
+        const status = form.querySelector(`select[name="status_${nisn}"]`).value;
+        const keteranganInput = form.querySelector(`textarea[name="keterangan_${nisn}"]`);
+        
+        let keterangan = keteranganInput.value.trim();
+        const nama = form.querySelector(`input[name="nama_${nisn}"]`).value;
+        const kelas = form.querySelector(`input[name="kelas_${nisn}"]`).value;
+        const jurusan = form.querySelector(`input[name="jurusan_${nisn}"]`).value;
+        const dateInput = form.querySelector('input[name="date"]').value;
+
+        // Logic: Jika Hadir/Alpha, kosongkan keterangan sebelum dikirim
+        if (status === 'Hadir' || status === 'Alpha') {
+            keterangan = '-'; 
+        } else if (keterangan === '') {
+             keterangan = '-'; 
+        }
+        
+        const submissionTime = getTimeString(new Date()); 
+        const time = (status === 'Hadir') ? submissionTime : ''; 
+
+        const updates = [{ 
+            nisn, nama, kelas, jurusan, date: dateInput, status, 
+            keterangan: keterangan, time: time,
+        }];
+
+        showModal('Mengirim Data', `Menyimpan absensi ${nama} (${status}) secara individual...`, 'loading', 0);
+
+        const payload = new URLSearchParams({
+            action: 'handleManualAttendanceUpdate',
+            updates: JSON.stringify(updates),
+            submittedBy: currentUser.role
+        });
+
+        const result = await postData(payload);
+        hideModal();
+        
+        if (result && result.status === 'success') {
+            showModal('Penyimpanan Berhasil', `Absensi ${nama} berhasil diperbarui.`, 'success', 3000);
+            
+            // Re-load the list to update the 'updated_at' time if needed
+            const loadForm = document.getElementById('manual-attendance-form');
+            if (loadForm) {
+                 setTimeout(() => loadForm.dispatchEvent(new Event('submit')), 50); 
+            } else {
+                 selectTab('absensi-siswa'); 
+            }
+
+        } else {
+            showModal('Penyimpanan Gagal', result ? result.message : 'Terjadi kesalahan saat menyimpan data absensi tunggal.', 'error', 5000);
+        }
+    }
+
 
     async function handleSubmitManualAttendance(e) {
         e.preventDefault();
@@ -2140,7 +2226,7 @@
             const initialScore = (type === 'harian') ? student.scoreHarian : student.scoreFinal;
             
             row.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     ${student.nisn}
                     <input type="hidden" name="nisn" value="${student.nisn}">
                     <input type="hidden" name="nama_${student.nisn}" value="${student.nama}">
@@ -2149,14 +2235,75 @@
                     <input type="hidden" name="type" value="${type}">
                     <input type="hidden" name="date" value="${date}">
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${student.nama}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${student.nama}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm">
                     <input type="number" name="score_${student.nisn}" min="0" max="100" value="${initialScore || ''}" placeholder="Nilai" class="w-24 text-center px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500">
+                </td>
+                <!-- FIX BUG 2: Tombol Simpan Individual -->
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <button type="button" onclick="handleSingleAssessmentUpdate('${student.nisn}')" 
+                        class="bg-green-500 hover:bg-green-600 text-white text-xs font-semibold py-1 px-3 rounded-lg shadow-md transition duration-150 flex items-center">
+                        <span data-lucide="save" class="w-4 h-4 mr-1"></span> Simpan
+                    </button>
                 </td>
             `;
             body.appendChild(row);
         });
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
+
+    async function handleSingleAssessmentUpdate(nisn) {
+        const form = document.getElementById('assessment-submit-form');
+        if (!form) return;
+
+        const type = form.querySelector('input[name="type"]').value;
+        const date = form.querySelector('input[name="date"]').value;
+        const scoreInput = form.querySelector(`input[name="score_${nisn}"]`);
+        const score = scoreInput.value.trim();
+        
+        if (score === '' || parseInt(score) < 0 || parseInt(score) > 100) {
+             showModal('Validasi Nilai', `Nilai harus antara 0 dan 100.`, 'error', 3000);
+             return;
+        }
+
+        const updates = [{ 
+            nisn: nisn, 
+            nama: form.querySelector(`input[name="nama_${nisn}"]`).value,
+            kelas: form.querySelector(`input[name="kelas_${nisn}"]`).value,
+            jurusan: form.querySelector(`input[name="jurusan_${nisn}"]`).value,
+            score: score,
+        }];
+        
+        showModal('Mengirim Data', `Menyimpan nilai ${type.toUpperCase()} untuk NISN ${nisn} secara individual...`, 'loading', 0);
+
+        // API call to GAS to save the batch update with a single item
+        const payload = new URLSearchParams({
+            action: 'saveAssessmentBatch',
+            type: type,
+            date: date,
+            updates: JSON.stringify(updates),
+            submittedBy: currentUser.role
+        });
+
+        const result = await postData(payload);
+        hideModal();
+        
+        if (result && result.status === 'success') {
+            showModal('Penyimpanan Berhasil', `Nilai ${type.toUpperCase()} untuk NISN ${nisn} berhasil diperbarui.`, 'success', 3000);
+            
+            // Refresh list after save
+            const loadForm = document.getElementById('assessment-load-form');
+            if (loadForm) {
+                 setTimeout(() => loadForm.dispatchEvent(new Event('submit')), 50);
+            } else {
+                 selectTab('penilaian');
+            }
+
+        } else {
+            showModal('Penyimpanan Gagal', result ? result.message : 'Terjadi kesalahan saat menyimpan data. Pastikan fungsi Apps Script sudah di-redeploy.', 'error', 5000);
+        }
+    }
+
 
     function handleScoreInput(e) {
         if (e.target.tagName.toLowerCase() === 'input' && e.target.name.startsWith('score_')) {
