@@ -29,29 +29,56 @@
         .chart-container {
             width: 100%;
         }
-        /* CSS untuk menyembunyikan elemen non-cetak saat window.print() dipanggil */
+        /* CSS untuk menyembunyikan elemen non-cetak saat window.print() dipanggil (PERBAIKAN 1) */
         @media print {
-            header, nav, .flex.justify-end, .page:not(#dashboard-container), h2, .bg-purple-50, .bg-indigo-50, #modal-message, #mini-popup, #dashboard-tabs {
+            /* Sembunyikan elemen navigasi dan kontrol */
+            header, nav, .flex.justify-end, .page:not(#dashboard-container), 
+            h2, .bg-purple-50, .bg-indigo-50, #modal-message, #mini-popup, #dashboard-tabs, 
+            #teacher-recap-form, #admin-recap-form, .print-hidden, 
+            #recap-results > div:nth-child(1), #admin-recap-results > div:nth-child(1) {
                 display: none !important;
             }
-            main {
+            
+            /* Tampilkan header tabel di setiap halaman */
+            thead {
+                display: table-header-group;
+            }
+            
+            /* Atur ulang margin dan padding untuk cetak penuh */
+            body, main {
                 margin: 0 !important;
                 padding: 0 !important;
+                min-height: auto !important;
             }
-            /* Pastikan hanya elemen yang relevan (tabel, chart) yang dicetak */
+            
+            /* Pastikan konten utama yang dicetak menempati seluruh lebar kertas */
             #tab-content {
                 box-shadow: none !important;
                 border: none !important;
-                /* Cetak semua isi, bukan hanya yang terlihat */
                 overflow: visible !important;
                 min-height: auto !important;
+                width: 100% !important; 
+                padding: 0 !important;
             }
-            /* Pastikan tabel terlihat jelas saat dicetak */
+            
+            /* Tampilkan hasil rekap dan tabel */
+            #recap-results, #admin-recap-results {
+                display: block !important;
+            }
+            
+            /* Reset overflow untuk mencetak semua baris tabel */
+            .overflow-x-auto {
+                overflow: visible !important;
+            }
+
             table {
                 font-size: 10pt;
+                width: 100% !important;
+                table-layout: fixed; /* Penting agar kolom tidak melebar tak tentu */
             }
-            thead {
-                display: table-header-group;
+            td, th {
+                white-space: normal; /* Izinkan teks memecah baris */
+                padding: 4px;
             }
         }
     </style>
@@ -129,7 +156,7 @@
 
         <!-- Dashboard Container (Dynamic Content) -->
         <div id="dashboard-container" class="page hidden">
-            <div class="flex justify-end mb-4">
+            <div class="flex justify-end mb-4 print-hidden">
                 <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md">
                     <span data-lucide="log-out" class="w-5 h-5 mr-2"></span> Keluar
                 </button>
@@ -787,9 +814,10 @@
         if (savedState) {
             try {
                 const state = JSON.parse(savedState);
-                // Menambahkan pemeriksaan tanggal hari ini untuk menghindari masalah cache data hari sebelumnya
-                const today = new Date().toISOString().split('T')[0];
-                if (state.lastLoginDate === today && state.user && state.role && state.tab) {
+                
+                // PERBAIKAN BUG REFRESH: Hapus pengecekan tanggal harian yang agresif.
+                // Sesi akan dipertahankan selama user belum logout.
+                if (state.user && state.role && state.tab) {
                     currentUser = state.user;
                     currentRole = state.role;
                     initializeDashboard(state.tab);
@@ -810,7 +838,7 @@
             localStorage.setItem('absensiAppState', JSON.stringify({
                 role: currentUser.role,
                 tab: currentTab,
-                lastLoginDate: new Date().toISOString().split('T')[0], // Save current date
+                lastLoginDate: new Date().toISOString().split('T')[0], // Simpan tanggal login (untuk referensi, tidak wajib untuk sesi)
                 user: {
                     nisn: currentUser.nisn, nip: currentUser.nip, nama: currentUser.nama,
                     kelas: currentUser.kelas, jurusan: currentUser.jurusan,
@@ -1352,24 +1380,25 @@
         
         return `
             <!-- NEW: Total Summary (Perbaikan 1) -->
-            <div id="${canvasId}-summary" class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+            <div id="${canvasId}-summary" class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6 print-hidden">
                 <!-- Cards Summary Here -->
             </div>
 
             <!-- NEW: Chart Container -->
-            <div class="mb-8 p-6 bg-white rounded-xl shadow-lg border border-gray-100">
+            <div class="mb-8 p-6 bg-white rounded-xl shadow-lg border border-gray-100 print-hidden">
                 <h4 class="text-xl font-bold text-gray-700 mb-4 flex items-center"><span data-lucide="bar-chart-2" class="w-5 h-5 mr-2 text-indigo-500"></span> Statistik Kehadiran</h4>
                 <div class="chart-container relative h-64 md:h-80">
                     <canvas id="${canvasId}"></canvas>
                 </div>
             </div>
 
-            <div class="flex justify-end space-x-3 mb-4">
+            <div class="flex justify-end space-x-3 mb-4 print-hidden">
                 <button onclick="handleExport('print')" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg flex items-center">
                     <span data-lucide="printer" class="w-4 h-4 mr-2"></span> Cetak
                 </button>
-                <button onclick="handleExport('xlsx')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center">
-                    <span data-lucide="file-text" class="w-4 h-4 mr-2"></span> Export XLSX
+                <!-- PERBAIKAN 2: Mengganti Export XLSX menjadi Database (Google Sheet) -->
+                <button onclick="openGoogleSheetLink()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center">
+                    <span data-lucide="database" class="w-4 h-4 mr-2"></span> Database
                 </button>
             </div>
             <div class="overflow-x-auto rounded-lg shadow-lg">
@@ -1396,7 +1425,7 @@
     function renderTeacherRecap() {
         return `
             <h3 class="text-2xl font-bold text-gray-700 mb-6">Rekapitulasi Absensi Siswa</h3>
-            <div class="bg-indigo-50 p-5 rounded-lg shadow-inner mb-6">
+            <div class="bg-indigo-50 p-5 rounded-lg shadow-inner mb-6 print-hidden">
                 <form id="teacher-recap-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div>
                         <label for="rekap-kelas" class="block text-sm font-medium text-gray-700">Kelas</label>
@@ -1440,7 +1469,7 @@
         return `
             <h3 class="text-2xl font-bold text-gray-700 mb-6">Perbandingan Demografi dan Kehadiran Kelas & Jurusan</h3>
             <p class="text-gray-500 mb-6">Pilih kriteria perbandingan yang ingin Anda lihat.</p>
-            <div class="bg-purple-50 p-5 rounded-lg shadow-inner mb-8">
+            <div class="bg-purple-50 p-5 rounded-lg shadow-inner mb-8 print-hidden">
                 <form id="comparison-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div class="col-span-2">
                         <label for="comparison-filter" class="block text-sm font-medium text-gray-700">Jenis Kriteria Perbandingan</label>
@@ -1485,7 +1514,7 @@
 
         return `
             <h3 class="text-2xl font-bold text-gray-700 mb-6">Input / Edit Absensi Siswa (Manual)</h3>
-            <div class="bg-indigo-50 p-5 rounded-lg shadow-inner mb-6">
+            <div class="bg-indigo-50 p-5 rounded-lg shadow-inner mb-6 print-hidden">
                 <form id="manual-attendance-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div>
                         <label for="manual-kelas" class="block text-sm font-medium text-gray-700">Kelas</label>
@@ -1524,7 +1553,7 @@
                                             <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Nama Siswa</th>
                                             <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
                                             <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Keterangan</th>
-                                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Aksi</th>
+                                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider print-hidden">Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody id="student-list-body" class="bg-white divide-y divide-gray-200">
@@ -1532,7 +1561,7 @@
                                     </tbody>
                                 </table>
                             </div>
-                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 flex items-center justify-center">
+                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 flex items-center justify-center print-hidden">
                                 <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Absensi Massal
                             </button>
                             </form>
@@ -1545,7 +1574,7 @@
 
         return `
             <h3 class="text-2xl font-bold text-gray-700 mb-6 flex items-center"><span data-lucide="file-plus" class="w-6 h-6 mr-2"></span> Input Penilaian Siswa</h3>
-            <div class="bg-green-50 p-5 rounded-xl shadow-inner mb-6">
+            <div class="bg-green-50 p-5 rounded-xl shadow-inner mb-6 print-hidden">
                 <form id="assessment-load-form" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                     <div>
                         <label for="assessment-type" class="block text-sm font-medium text-gray-700">Jenis Penilaian</label>
@@ -1590,7 +1619,7 @@
                                     <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">NISN</th>
                                     <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Nama Siswa</th>
                                     <th id="assessment-score-label" class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Nilai (0-100)</th>
-                                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Aksi</th>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider print-hidden">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody id="assessment-student-list-body" class="bg-white divide-y divide-gray-200">
@@ -1598,7 +1627,7 @@
                             </tbody>
                         </table>
                     </div>
-                    <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 flex items-center justify-center">
+                    <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 flex items-center justify-center print-hidden">
                         <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Nilai Massal
                     </button>
                 </form>
@@ -1610,7 +1639,7 @@
          return `
             <h3 class="text-2xl font-bold text-gray-700 mb-6">Konfigurasi Aplikasi</h3>
             <p class="text-gray-500 mb-6">Perbarui detail sekolah yang ditampilkan di header aplikasi.</p>
-            <div class="bg-indigo-50 p-6 rounded-xl shadow-inner mb-8">
+            <div class="bg-indigo-50 p-6 rounded-xl shadow-inner mb-8 print-hidden">
                 <form id="admin-config-form" class="space-y-6">
                     <div>
                         <label for="config-school-name" class="block text-sm font-medium text-gray-700">Nama Sekolah</label>
@@ -1629,7 +1658,7 @@
                 </form>
             </div>
 
-            <div class="bg-gray-100 p-6 rounded-xl shadow-md space-y-4">
+            <div class="bg-gray-100 p-6 rounded-xl shadow-md space-y-4 print-hidden">
                 <h4 class="text-lg font-bold text-gray-700">Opsi Alternatif: Logo Base64</h4>
                 <div>
                     <label for="config-logo-base64" class="block text-sm font-medium text-gray-700">Tempel String Base64 Gambar</label>
@@ -1648,7 +1677,7 @@
 
         return `
             <h3 class="text-2xl font-bold text-gray-700 mb-6">Rekapitulasi Global Absensi Siswa</h3>
-            <div class="bg-indigo-50 p-5 rounded-lg shadow-inner mb-6">
+            <div class="bg-indigo-50 p-5 rounded-lg shadow-inner mb-6 print-hidden">
                 <form id="admin-recap-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div>
                         <label for="admin-rekap-kelas" class="block text-sm font-medium text-gray-700">Kelas</label>
@@ -1691,7 +1720,7 @@
         
         return `
             <h3 class="text-2xl font-bold text-gray-700 mb-6">Manajemen Data Siswa</h3>
-            <div class="bg-purple-50 p-5 rounded-lg shadow-inner mb-6">
+            <div class="bg-purple-50 p-5 rounded-lg shadow-inner mb-6 print-hidden">
                 <form id="admin-management-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div class="md:col-span-2">
                         <label for="admin-search-student" class="block text-sm font-medium text-gray-700">Cari NISN/Nama</label>
@@ -1722,7 +1751,7 @@
             <p id="admin-management-message" class="text-center text-gray-500 py-10">Memuat data siswa...</p>
             
             <form id="admin-student-update-form" class="hidden">
-                   <div class="flex flex-col space-y-3 md:flex-row justify-between items-center mb-4 md:space-y-0">
+                   <div class="flex flex-col space-y-3 md:flex-row justify-between items-center mb-4 md:space-y-0 print-hidden">
                     <button type="button" onclick="openAddStudentModal()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center">
                         <span data-lucide="user-plus" class="w-4 h-4 mr-2"></span> Tambah Siswa Baru
                     </button>
@@ -1747,8 +1776,8 @@
                                 <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Kelas</th>
                                 <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Jurusan</th>
                                 <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Email</th>
-                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Password</th>
-                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Aksi</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider print-hidden">Password</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider print-hidden">Aksi</th>
                             </tr>
                         </thead>
                         <tbody id="admin-student-list-body" class="bg-white divide-y divide-gray-200">
@@ -1756,7 +1785,7 @@
                         </tbody>
                     </table>
                 </div>
-                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 flex items-center justify-center">
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 flex items-center justify-center print-hidden">
                     <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Perubahan Data Massal
                 </button>
             </form>
@@ -2030,7 +2059,7 @@
                     <textarea name="keterangan_${student.nisn}" rows="1" placeholder="Keterangan (jika Izin/Sakit)" class="w-full px-3 py-2 border rounded-md resize-none ${keteranganClass}" ${isKeteranganDisabled ? 'disabled' : ''}>${initialKeterangan}</textarea>
                 </td>
                 <!-- FIX BUG 2: Tombol Simpan Individual -->
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500 print-hidden">
                     <button type="button" onclick="handleSingleManualAttendanceUpdate('${student.nisn}')" 
                         class="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold py-1 px-3 rounded-lg shadow-md transition duration-150 flex items-center">
                         <span data-lucide="save" class="w-4 h-4 mr-1"></span> Simpan
@@ -2240,7 +2269,7 @@
                     <input type="number" name="score_${student.nisn}" min="0" max="100" value="${initialScore || ''}" placeholder="Nilai" class="w-24 text-center px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500">
                 </td>
                 <!-- FIX BUG 2: Tombol Simpan Individual -->
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500 print-hidden">
                     <button type="button" onclick="handleSingleAssessmentUpdate('${student.nisn}')" 
                         class="bg-green-500 hover:bg-green-600 text-white text-xs font-semibold py-1 px-3 rounded-lg shadow-md transition duration-150 flex items-center">
                         <span data-lucide="save" class="w-4 h-4 mr-1"></span> Simpan
@@ -2504,10 +2533,10 @@
                                pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
                                class="w-full px-2 py-1 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 print-hidden">
                         <input type="password" name="password_${s.nisn}" value="${s.password || ''}" placeholder="Kosongkan untuk tetap" class="w-full px-2 py-1 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 print-hidden">
                         <button type="button" onclick="handleDeleteStudent('${s.nisn}', '${s.nama}')" class="text-red-600 hover:text-red-900">
                             <span data-lucide="trash-2" class="w-4 h-4 inline-block"></span>
                         </button>
@@ -2836,16 +2865,16 @@
         if (type === 'print') {
             window.print();
         } else if (type === 'xlsx') {
-            showModal('Fitur Tidak Tersedia', 'Fitur Export XLSX memerlukan library sisi klien yang kompleks. Silakan gunakan tombol "Edit Data di Google Sheet" dan lakukan export secara manual dari sana.', 'info', 5000, 'file-export');
+             // Bagian ini sudah dihapus dari UI, diganti dengan Database
         }
     }
     
-    // Helper function to open Google Sheet (Perbaikan: Mengganti alert dengan showModal)
+    // Helper function to open Google Sheet (Perbaikan 2: Digunakan oleh tombol Database)
     function openGoogleSheetLink() {
         if (GOOGLE_SHEET_URL) {
             window.open(GOOGLE_SHEET_URL, '_blank');
         } else {
-            showModal('Konfigurasi Belum Selesai', 'URL Google Sheet belum dikonfigurasi.', 'error', 3000);
+            showModal('Konfigurasi Belum Selesai', 'URL Google Sheet belum dikonfigurasi. Harap periksa variabel GOOGLE_SHEET_URL di baris 33.', 'error', 5000);
         }
     }
 
