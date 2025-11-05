@@ -8,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com/"></script>
     <!-- Lucide Icons for aesthetic icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Chart.js CDN for interactive charts -->
+    <!-- NEW: Chart.js CDN for interactive charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
@@ -17,6 +17,7 @@
             background-color: #f7f7f7;
             min-height: 100vh;
         }
+        /* Custom scrollbar for better look */
         .custom-scrollbar::-webkit-scrollbar {
             width: 6px;
         }
@@ -24,32 +25,27 @@
             background-color: #6d28d9;
             border-radius: 10px;
         }
+        /* Ensure chart container maintains size */
         .chart-container {
             width: 100%;
         }
+        /* CSS untuk menyembunyikan elemen non-cetak saat window.print() dipanggil */
         @media print {
-            header, nav, .flex.justify-end, .page:not(#dashboard-container), h2, .bg-purple-50, .bg-indigo-50, #dashboard-tabs {
+            header, nav, .flex.justify-end, .page:not(#dashboard-container), h2, .bg-purple-50, .bg-indigo-50 {
                 display: none !important;
             }
             main {
                 margin: 0 !important;
                 padding: 0 !important;
             }
+            /* Pastikan hanya elemen yang relevan (tabel, chart) yang dicetak */
             #tab-content {
                 box-shadow: none !important;
                 border: none !important;
-                /* Pastikan konten yang dicetak terlihat */
-                display: block !important;
-                width: 100% !important;
             }
-            /* Menyesuaikan tampilan chart untuk cetak */
-            .chart-container {
-                height: 400px !important; /* Fixed height for printing */
-                page-break-before: always;
-            }
-            /* Hindari pemotongan baris/tabel */
-            tr, table {
-                page-break-inside: avoid;
+            /* Pastikan modal untuk menambah siswa tersembunyi */
+            #add-student-modal {
+                display: none !important;
             }
         }
     </style>
@@ -60,7 +56,7 @@
     <header class="bg-indigo-800 text-white shadow-xl p-4 md:p-6">
         <div class="container mx-auto flex flex-col md:flex-row justify-between items-center space-y-3 md:space-y-0">
             
-            <!-- Logo dan Nama Sekolah -->
+            <!-- Logo dan Nama Sekolah (Diperbarui untuk Estetika Modern) -->
             <div class="flex items-center space-x-3 order-1 md:order-1 w-full md:w-auto">
                 <img id="school-logo" class="h-10 w-auto rounded-full shadow-lg transition transform hover:scale-105" 
                     src="https://placehold.co/40x40/ffffff/indigo?text=S" 
@@ -204,9 +200,9 @@
                     <label for="new-email" class="block text-sm font-medium text-gray-700">Email <span class="text-red-500">*</span></label>
                     <!-- Perbaikan 1: Menggunakan type="text" dengan pattern untuk karakter '-' -->
                     <input type="text" id="new-email" name="email" required 
-                                placeholder="email@sekolah.sch.id (Mengizinkan strip/hyphen)" 
-                                pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-                                class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                           placeholder="email@sekolah.sch.id (Mengizinkan strip/hyphen)" 
+                           pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+                           class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
                     <p class="text-xs text-gray-500 mt-1">Pastikan email valid. Karakter strip (-) diizinkan di nama pengguna.</p>
                 </div>
                 <div>
@@ -249,22 +245,18 @@
     let allStudentsData = []; // Data mentah semua siswa untuk Admin Management
     let currentRecapData = [];
 
-    // FIX 1: Global list of all possible majors (for admin views)
-    const MASTER_JURUSAN_OPTIONS = ["FARMASI 1", "FARMASI 2", "KEPERAWATAN 1", "KEPERAWATAN 2", "TKR", "TJKT 1", "TJKT 2"];
-    
-    const CURRENT_DATE_WIB = new Date().toLocaleString('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').join('-'); // YYYY-MM-DD
-    
-    let recapChartInstance = null;
-    let comparisonChartInstanceClass = null; 
-    let comparisonChartInstanceMajor = null; 
-    let adminRecapChartInstance = null;
-
     // NEW: Global state untuk filter manajemen siswa
     let currentFilterTerm = '';
     let currentFilterKelas = '';
     let currentFilterJurusan = '';
     let currentFilteredStudentCount = 0;
 
+    const CURRENT_DATE_WIB = new Date().toLocaleString('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').join('-'); // YYYY-MM-DD
+    
+    let recapChartInstance = null;
+    let comparisonChartInstanceClass = null; 
+    let comparisonChartInstanceMajor = null; 
+    let adminRecapChartInstance = null;
 
     // --- ROLE MAP ---
     const ROLE_MAP = {
@@ -294,7 +286,7 @@
 
 
     // ====================================================================
-    // --- 2. UTILITY & MODAL FUNCTIONS ---
+    // --- 2. UTILITY & MODAL FUNCTIONS (Semua harus ada di atas) ---
     // ====================================================================
 
     function getTimeString(dateObj) {
@@ -414,11 +406,14 @@
 
     function showMiniPopup(type, targetInput, value) {
         const popup = document.getElementById('mini-popup');
+        const textEl = document.getElementById('mini-popup-text');
         const applyBtn = document.getElementById('mini-popup-apply');
         
         const isScore = (type === 'score');
         const isHadir = (type === 'hadir');
+        const label = isScore ? `Nilai ${value}` : (isHadir ? `Status 'Hadir'` : `Keterangan '${value}'`);
         
+        textEl.innerHTML = `<span data-lucide="zap" class="w-5 h-5 text-indigo-500"></span> <span>Terapkan ${label} ini ke semua baris yang kosong?</span>`;
         applyBtn.classList.toggle('bg-indigo-600', !isScore);
         applyBtn.classList.toggle('hover:bg-indigo-700', !isScore);
         applyBtn.classList.toggle('bg-green-600', isScore);
@@ -460,34 +455,27 @@
         }
         
         if (targetInputs) {
-            let changesCount = 0;
             targetInputs.forEach(input => {
-                let oldValue = input.value.trim();
-                let newValue = value;
-                
                 if (type === 'keterangan') {
-                    if (oldValue === '') {
-                        input.value = newValue;
-                        changesCount++;
+                    if (input.value.trim() === '') {
+                        input.value = value;
                     }
                 } else if (type === 'score') {
-                    if (oldValue === '' || parseInt(oldValue) === 0) {
-                        input.value = newValue;
-                        changesCount++;
+                    if (input.value === '' || parseInt(input.value) === 0) {
+                        input.value = value;
                     }
                 } else if (type === 'hadir') {
-                    if (oldValue !== 'Hadir') {
+                    if (input.value !== 'Hadir') {
                         input.value = 'Hadir';
                         input.dispatchEvent(new Event('change'));
-                        changesCount++;
                     }
                 }
             });
-            showModal('Berhasil Diterapkan', `${changesCount} baris telah diisi dengan nilai/keterangan/status yang sama.`, 'success', 2000);
+            showModal('Berhasil Diterapkan', `${targetInputs.length} baris telah diisi dengan nilai/keterangan/status yang sama.`, 'success', 2000);
         }
     }
 
-    // --- ROLE SELECTION RENDERING ---
+    // --- ROLE SELECTION RENDERING (DIPINDAHKAN KE SINI) ---
 
     function renderRoleSelection() {
         const roleContainer = document.getElementById('role-selection');
@@ -499,7 +487,7 @@
             button.id = `role-btn-${role.id}`;
             button.className = `flex-1 flex items-center justify-center space-x-2 px-6 py-3 m-1 rounded-lg text-sm font-semibold transition-all duration-200 focus:outline-none`;
             button.innerHTML = `<span data-lucide="${role.icon}" class="w-5 h-5"></span><span>${role.label}</span>`;
-            button.onclick = () => selectRole(role.id);
+            button.onclick = () => selectRole(role.id); // <-- PANGGILAN selectRole
             roleContainer.appendChild(button);
         });
         
@@ -515,7 +503,7 @@
 
 
     // ====================================================================
-    // --- 3. GAS COMMUNICATION FUNCTIONS (EFFICIENT & ROBUST) ---
+    // --- 3. GAS COMMUNICATION FUNCTIONS ---
     // ====================================================================
 
     async function fetchData(endpointUrl) {
@@ -539,22 +527,24 @@
 
             try {
                 const result = JSON.parse(text);
+                if (result.status === 'error' && result.message.includes('Aksi tidak dikenali.')) {
+                    const specificError = `Error: ${result.message} Anda perlu melakukan REDEPLOY ULANG Google Apps Script sebagai VERSI BARU setelah menambahkan kode fungsi 'getStudentHistory(e)' dan 'getComparisonData(e)' ke file Code.gs.`;
+                    return { status: 'error', message: specificError };
+                }
                 return result;
             } catch (e) {
-                const lowerText = text.toLowerCase();
-                if (lowerText.includes('berhasil') || lowerText.includes('updated') || lowerText.includes('success')) {
+                if (text.includes('Absensi berhasil disimpan.') || text.includes('Pembaruan nilai berhasil.')) {
                     return { status: 'success', message: text };
                 }
                 if (text.startsWith('Error:')) {
                     return { status: 'error', message: text };
                 }
-                return { status: 'error', message: 'Respon server tidak terduga, bukan JSON/Success Text: ' + text.substring(0, 100) + '...' };
+                return { status: 'error', message: 'Respon server tidak terduga, bukan JSON: ' + text };
             }
-
         } catch (error) {
-            console.error('Fetch/Network/CORS Error:', error);
+            console.error('Fetch/CORS Error:', error);
             const errorMessage = 'Gagal terhubung ke server Apps Script (Network/CORS Error). Pastikan Web App Anda di Apps Script: 1) URL berakhiran /exec sudah benar, 2) Akses disetel "Anyone" (Siapa saja) saat di-deploy, dan 3) Sudah di-REDEPLOY sebagai VERSI BARU.';
-            showModal('Koneksi Gagal / Jaringan Error', errorMessage, 'error', 7000);
+            showModal('Koneksi Gagal', errorMessage, 'error', 7000); 
             return { status: 'error', message: errorMessage };
         }
     }
@@ -581,20 +571,19 @@
                 const result = JSON.parse(text);
                 return result;
             } catch (e) {
-                const lowerText = text.toLowerCase();
-                if (lowerText.includes('berhasil') || lowerText.includes('updated') || lowerText.includes('success')) {
+                if (text.includes('Absensi berhasil disimpan.') || text.includes('Pembaruan nilai berhasil.') || text.includes('Data siswa baru berhasil ditambahkan.') || text.includes('siswa telah dihapus berdasarkan filter')) {
                     return { status: 'success', message: text };
                 }
                 if (text.startsWith('Error:')) {
                     return { status: 'error', message: text };
                 }
-                return { status: 'error', message: 'Respon POST tidak terduga, bukan JSON/Success Text: ' + text.substring(0, 100) + '...' };
+                return { status: 'error', message: 'Respon POST tidak terduga, bukan JSON: ' + text };
             }
 
         } catch (error) {
-            console.error('Fetch/Network/CORS Error:', error);
-            const errorMessage = 'Gagal terhubung ke server Apps Script (Network/CORS Error). Pastikan Web App Anda di Apps Script: 1) URL berakhiran /exec sudah benar, 2) Akses disetel "Anyone" (Siapa saja) saat di-deploy, dan 3) Sudah di-REDEPLOY sebagai VERSI BARU.';
-            showModal('Koneksi Gagal / Jaringan Error', errorMessage, 'error', 7000);
+            console.error('Fetch/CORS Error:', error);
+            const errorMessage = 'Gagal mengirim data ke server Apps Script (Network/CORS Error). Pastikan Web App Anda di Apps Script: 1) URL berakhiran /exec sudah benar, 2) Akses disetel "Anyone" (Siapa saja) saat di-deploy, dan 3) Sudah di-REDEPLOY sebagai VERSI BARU.';
+            showModal('Koneksi Gagal', errorMessage, 'error', 7000);
             return { status: 'error', message: errorMessage };
         }
     }
@@ -604,6 +593,7 @@
     // --- 4. CORE LOGIC (LOGIN, NAVIGATION, STATE) ---
     // ====================================================================
     
+    // FIX: renderDashboardTabs dan renderTabContent dipindahkan ke atas
     function renderDashboardTabs() {
         const tabsContainer = document.querySelector('#dashboard-tabs nav');
         tabsContainer.innerHTML = '';
@@ -622,11 +612,16 @@
     
     async function renderTabContent(tabId) {
         const contentDiv = document.getElementById('tab-content');
-        contentDiv.innerHTML = `<div class="flex justify-center items-center py-10"><div class="animate-spin"><span data-lucide="loader-circle" class="w-8 h-8 text-indigo-500"></span></div><span class="ml-3 text-indigo-600 font-semibold">Memuat data tab ${tabId}...</span></div>`;
+        contentDiv.innerHTML = `<div class="flex justify-center items-center py-10"><div class="animate-spin"><span data-lucide="loader-circle" class="w-8 h-8 text-indigo-500"></span></div><span class="ml-3 text-indigo-600">Memuat data...</span></div>`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
         hideMiniPopup();
 
-        // Destroy previous charts
+        if (tabId === 'absensi') {
+            await Promise.all([checkStudentAttendanceStatus(), getStudentHistory()]);
+        }
+        
+        contentDiv.innerHTML = '';
+
         if (recapChartInstance) { recapChartInstance.destroy(); recapChartInstance = null; }
         if (adminRecapChartInstance) { adminRecapChartInstance.destroy(); adminRecapChartInstance = null; }
         if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; }
@@ -636,13 +631,6 @@
             currentRecapData = [];
         }
 
-
-        // Special pre-loading for 'absensi' tab to ensure data is ready
-        if (tabId === 'absensi') {
-            await Promise.all([checkStudentAttendanceStatus(), getStudentHistory()]);
-        }
-        
-        contentDiv.innerHTML = ''; // Clear loading screen
 
         switch (tabId) {
             case 'absensi':
@@ -722,15 +710,12 @@
     }
 
 
-    // Req 2 FIX: Robust State Persistence using localStorage
     function loadAppState() {
         const savedState = localStorage.getItem('absensiAppState');
         if (savedState) {
             try {
                 const state = JSON.parse(savedState);
-                const userValid = state.user && state.user.nama && (state.user.nisn || state.user.nip);
-
-                if (userValid && state.role && state.tab) {
+                if (state.user && state.role && state.tab) {
                     currentUser = state.user;
                     currentRole = state.role;
                     initializeDashboard(state.tab);
@@ -744,18 +729,11 @@
         return false;
     }
 
-    // Req 2 FIX: Save app state whenever role or tab changes
     function saveAppState() {
-        if (currentUser && currentUser.role) {
-            // Ensure we save a valid tab ID, defaulting to the first tab if currentTab is invalid
-            let activeTab = currentTab;
-            if (!activeTab && TABS[currentUser.role] && TABS[currentUser.role].length > 0) {
-                 activeTab = TABS[currentUser.role][0].id;
-            }
-
+        if (currentUser && currentUser.role && currentTab) {
             localStorage.setItem('absensiAppState', JSON.stringify({
                 role: currentUser.role,
-                tab: activeTab,
+                tab: currentTab,
                 user: {
                     nisn: currentUser.nisn, nip: currentUser.nip, nama: currentUser.nama,
                     kelas: currentUser.kelas, jurusan: currentUser.jurusan,
@@ -774,10 +752,10 @@
         renderDashboardTabs();
         
         let tabToOpen = initialTab;
-        if (!tabToOpen || !TABS[currentUser.role].find(t => t.id === tabToOpen)) {
-            if (currentUser.role && TABS[currentUser.role]) {
-                tabToOpen = TABS[currentUser.role][0]?.id || 'profil'; 
-            }
+        if (!tabToOpen) {
+            if (currentUser.role === 'student') tabToOpen = 'absensi';
+            else if (currentUser.role === 'teacher') tabToOpen = 'rekap-guru';
+            else if (currentUser.role === 'admin') tabToOpen = 'rekap-admin';
         }
         selectTab(tabToOpen);
     }
@@ -790,7 +768,7 @@
 
         allStudentsData = []; currentRecapData = [];
         currentUser = null; currentRole = null; currentTab = '';
-        saveAppState(); // Removes state
+        saveAppState();
 
         showPage('entry-page');
         document.getElementById('username').value = '';
@@ -809,7 +787,7 @@
 
     function selectTab(tabId) {
         currentTab = tabId;
-        saveAppState(); // Save state on tab change
+        saveAppState();
 
         document.querySelectorAll('#dashboard-tabs button').forEach(btn => {
             btn.classList.remove('text-indigo-700', 'border-b-4', 'border-indigo-700', 'hover:bg-indigo-50');
@@ -1011,10 +989,9 @@
 
         messageDiv.classList.remove('hidden'); chartContainer.classList.add('hidden'); attendanceChartContainer.classList.add('hidden');
         
-        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-purple-500"></span></div><span class="ml-3 text-purple-600 font-semibold">Mengambil data perbandingan...</span></div>`;
+        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-purple-500"></span></div><span class="ml-3 text-purple-600">Mengambil data perbandingan...</span></div>`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
-        // Req 1 FIX: Send minimal parameters for efficiency
         const url = `${WEB_APP_URL}?action=getComparisonData&role=${currentUser.role}&nip=${currentUser.nip || ''}`;
         const result = await fetchData(url);
 
@@ -1035,16 +1012,16 @@
                 attendanceTitle = 'Perbandingan Persentase Kehadiran Antar Jurusan';
             }
 
-            // Render Chart 1: Demografi (Jumlah Siswa Total)
             if (demographicData.length > 0) {
+                // Render Chart 1: Demografi (Jumlah Siswa Total)
                 renderDemographicChart('comparison-chart', demographicData, demographicTitle);
                 chartTitleEl.textContent = demographicTitle;
                 chartContainer.classList.remove('hidden');
                 messageDiv.classList.add('hidden');
             }
 
-            // Render Chart 2: Kehadiran (Persentase Status)
             if (Object.keys(attendanceData).length > 0) {
+                 // Render Chart 2: Kehadiran (Persentase Status)
                 renderAttendanceComparisonChart('comparison-attendance-chart', attendanceData, attendanceTitle);
                 attendanceChartTitleEl.textContent = attendanceTitle;
                 attendanceChartContainer.classList.remove('hidden');
@@ -1072,13 +1049,12 @@
         const tableBody = document.getElementById(tableBodyId);
 
         resultsDiv.classList.add('hidden'); messageDiv.classList.remove('hidden');
-        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-indigo-500"></span></div><span class="ml-3 text-indigo-600 font-semibold">Mengambil data rekap...</span></div>`;
+        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-indigo-500"></span></div><span class="ml-3 text-indigo-600">Mengambil data rekap...</span></div>`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
         tableBody.innerHTML = '';
         
         document.getElementById(`${canvasId}-summary`).innerHTML = '';
 
-        // Req 1 FIX: Send minimal parameters for efficiency
         const url = `${WEB_APP_URL}?action=getRecap&kelas=${kelas}&jurusan=${jurusan}&periode=${periode}&role=${currentUser.role}&nip=${currentUser.nip || ''}`;
         const result = await fetchData(url);
         
@@ -1112,7 +1088,7 @@
                 else if (r.status === 'Alpha') statusColor = 'text-gray-600 bg-gray-200';
 
                 const displayNama = r.nama || 'Nama Tidak Ditemukan (Cek Apps Script)'; 
-                const formattedTime = r.time && r.time.trim() !== '' ? formatDateTime(r.date, r.time) : '-';
+                const formattedTime = formatDateTime(r.date, r.time);
 
 
                 html += `
@@ -1149,13 +1125,12 @@
         
         if (currentAttendanceRecord) {
             const record = currentAttendanceRecord;
-            const formattedTime = record.time && record.time.trim() !== '' ? formatDateTime(record.date, record.time) : '-';
             formSection = `
                 <h3 class="text-2xl font-bold text-emerald-600 mb-6 flex items-center">
                     <span data-lucide="check-circle" class="w-6 h-6 mr-2"></span> Absensi Hari Ini Selesai!
                 </h3>
                 <div class="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-lg shadow-md">
-                    <p class="font-semibold text-emerald-700">Anda telah mengisi absensi pada ${record.date} ${formattedTime} WIB.</p>
+                    <p class="font-semibold text-emerald-700">Anda telah mengisi absensi pada ${record.date}.</p>
                     <p class="mt-2 text-sm text-emerald-600">Status Anda: <span class="font-bold">${record.status}</span>. ${record.keterangan && record.keterangan !== '-' ? 'Keterangan: ' + record.keterangan : ''}</p>
                 </div>
             `;
@@ -1210,8 +1185,6 @@
         if (historyRecords.length === 0) {
             historyHtml += `<p class="text-gray-500 text-center py-4">Belum ada riwayat absensi yang tercatat.</p>`;
         } else {
-            historyRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
-
             historyHtml += `
                 <div class="overflow-x-auto rounded-lg shadow-lg border">
                     <table class="min-w-full divide-y divide-gray-200">
@@ -1225,7 +1198,8 @@
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
             `;
-            
+            historyRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
+
             historyRecords.forEach(record => {
                 let statusClass = '';
                 if (record.status === 'Hadir') statusClass = 'text-emerald-600 bg-emerald-100';
@@ -1233,7 +1207,7 @@
                 else if (record.status === 'Sakit') statusClass = 'text-red-600 bg-red-100';
                 else statusClass = 'text-gray-600 bg-gray-200';
                 
-                const formattedTime = record.time && record.time.trim() !== '' ? formatDateTime(record.date, record.time) : '-';
+                const formattedTime = formatDateTime(record.date, record.time);
 
                 historyHtml += `
                     <tr>
@@ -1418,7 +1392,7 @@
                 </div>
                 
                 <!-- NEW Chart 2: Persentase Kehadiran (Perbaikan 1) -->
-                    <div id="comparison-attendance-chart-container" class="hidden p-6 bg-white rounded-xl shadow-lg border border-gray-100">
+                   <div id="comparison-attendance-chart-container" class="hidden p-6 bg-white rounded-xl shadow-lg border border-gray-100">
                         <h4 id="comparison-attendance-chart-title" class="text-xl font-bold text-emerald-600 mb-4 flex items-center"><span data-lucide="pie-chart" class="w-5 h-5 mr-2"></span> Grafik Persentase Kehadiran</h4>
                         <div class="chart-container relative h-96 md:h-[500px]">
                             <canvas id="comparison-attendance-chart"></canvas>
@@ -1461,7 +1435,7 @@
             </div>
             
             <div id="manual-attendance-area" class="mt-8">
-                            <p id="manual-message" class="text-center text-gray-500 py-10">Pilih Kelas, Jurusan, dan Tanggal untuk memuat daftar siswa.</p>
+                             <p id="manual-message" class="text-center text-gray-500 py-10">Pilih Kelas, Jurusan, dan Tanggal untuk memuat daftar siswa.</p>
                         
                             <!-- Student List Table (will be populated dynamically) -->
                             <form id="manual-attendance-submit-form" class="hidden">
@@ -1555,8 +1529,7 @@
 
     function renderAdminGlobalRecap() {
         const allClasses = currentUser.kelasAjar || [];
-        // Use the master list for admin view to ensure all options are available
-        const allMajors = MASTER_JURUSAN_OPTIONS;
+        const allMajors = currentUser.jurusanAjar || [];
 
         return `
             <h3 class="text-2xl font-bold text-gray-700 mb-6">Rekapitulasi Global Absensi Siswa</h3>
@@ -1573,7 +1546,6 @@
                         <label for="admin-rekap-jurusan" class="block text-sm font-medium text-gray-700">Jurusan</label>
                         <select id="admin-rekap-jurusan" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
                             <option value="">-- Semua Jurusan --</option>
-                            <!-- FIX 1: Menggunakan Master Jurusan List -->
                             ${allMajors.map(j => `<option value="${j}">${j}</option>`).join('')}
                         </select>
                     </div>
@@ -1600,8 +1572,8 @@
 
     function renderAdminManagement() {
         const allClasses = currentUser.kelasAjar || [];
-        const allMajors = MASTER_JURUSAN_OPTIONS;
-
+        const allMajors = currentUser.jurusanAjar || [];
+        
         return `
             <h3 class="text-2xl font-bold text-gray-700 mb-6">Manajemen Data Siswa</h3>
             <div class="bg-purple-50 p-5 rounded-lg shadow-inner mb-6">
@@ -1621,14 +1593,13 @@
                         <label for="admin-filter-jurusan" class="block text-sm font-medium text-gray-700">Jurusan</label>
                         <select id="admin-filter-jurusan" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500">
                             <option value="">-- Semua Jurusan --</option>
-                            <!-- FIX 1: Menggunakan Master Jurusan List -->
                             ${allMajors.map(j => `<option value="${j}">${j}</option>`).join('')}
                         </select>
                     </div>
                     <div class="col-span-1 md:col-span-4 flex justify-end">
-                                     <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-6 rounded-lg flex items-center justify-center">
-                                         <span data-lucide="filter" class="w-4 h-4 mr-2"></span> Terapkan Filter
-                                     </button>
+                             <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-6 rounded-lg flex items-center justify-center">
+                                 <span data-lucide="filter" class="w-4 h-4 mr-2"></span> Terapkan Filter
+                             </button>
                     </div>
                 </form>
             </div>
@@ -1636,21 +1607,21 @@
             <p id="admin-management-message" class="text-center text-gray-500 py-10">Memuat data siswa...</p>
             
             <form id="admin-student-update-form" class="hidden">
-                       <div class="flex flex-col space-y-3 md:flex-row justify-between items-center mb-4 md:space-y-0">
-                        <button type="button" onclick="openAddStudentModal()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center">
-                            <span data-lucide="user-plus" class="w-4 h-4 mr-2"></span> Tambah Siswa Baru
+                 <div class="flex flex-col space-y-3 md:flex-row justify-between items-center mb-4 md:space-y-0">
+                    <button type="button" onclick="openAddStudentModal()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center">
+                        <span data-lucide="user-plus" class="w-4 h-4 mr-2"></span> Tambah Siswa Baru
+                    </button>
+                    
+                    <div class="flex space-x-3 w-full md:w-auto">
+                        <button onclick="openGoogleSheetLink()" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center">
+                            <span data-lucide="external-link" class="w-4 h-4 mr-2"></span> Edit Data di Sheet
                         </button>
-                        
-                        <div class="flex space-x-3 w-full md:w-auto">
-                            <button onclick="openGoogleSheetLink()" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center">
-                                <span data-lucide="external-link" class="w-4 h-4 mr-2"></span> Edit Data di Sheet
-                            </button>
-                            <!-- FIX: Mengganti teks tombol -->
-                            <button onclick="handleDeleteFilteredStudents()" type="button" id="bulk-delete-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center disabled:opacity-50" disabled>
-                                <span data-lucide="trash-2" class="w-4 h-4 mr-2"></span> Hapus ${currentFilteredStudentCount} Data
-                            </button>
-                        </div>
+                        <!-- NEW BULK DELETE BUTTON (Perbaikan 3) -->
+                        <button onclick="handleDeleteFilteredStudents()" type="button" id="bulk-delete-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center disabled:opacity-50" disabled>
+                            <span data-lucide="trash-2" class="w-4 h-4 mr-2"></span> Hapus Berdasarkan Filter
+                        </button>
                     </div>
+                </div>
 
                 <div id="admin-student-list-container" class="overflow-x-auto rounded-lg shadow-lg border mb-6">
                     <table class="min-w-full divide-y divide-gray-200">
@@ -1670,9 +1641,9 @@
                         </tbody>
                     </table>
                 </div>
-                           <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 flex items-center justify-center">
-                        <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Perubahan Data Massal
-                    </button>
+                   <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 flex items-center justify-center">
+                    <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Perubahan Data Massal
+                </button>
             </form>
         `;
     }
@@ -1687,7 +1658,6 @@
         currentAttendanceRecord = null;
         if (currentUser.role !== 'student') return;
 
-        // Req 1 FIX: Use minimal parameters for speed
         const url = `${WEB_APP_URL}?action=getStudentStatus&nisn=${currentUser.nisn}&date=${CURRENT_DATE_WIB}`;
         const result = await fetchData(url);
         
@@ -1708,7 +1678,7 @@
         } else {
              if (result && result.message && result.message.includes('Aksi tidak dikenali.')) {
                  console.error(`Gagal memuat riwayat absensi: Aksi "getStudentHistory" tidak dikenali di Apps Script.`);
-                 // Do not show modal here, as it blocks the UI. Console error is enough.
+                 showModal('Konfigurasi Server', 'Error: Aksi "getStudentHistory" tidak dikenali. Harap update Code.gs dan Redeploy Apps Script sebagai Versi Baru!', 'error', 7000);
              } else {
                  console.error(`Gagal memuat riwayat absensi: ${result ? result.message : 'Unknown Error'}`);
              }
@@ -1744,26 +1714,17 @@
         const form = e.target;
         const status = form.querySelector('input[name="status"]:checked').value;
         const keterangan = form.querySelector('#keterangan').value.trim();
-        const submissionTime = (status === 'Hadir') ? getTimeString(new Date()) : ''; // Only record time if Hadir
 
         showModal('Mengirim Data', 'Sedang mengirim data absensi Anda, mohon menunggu...', 'loading', 0);
 
-        // Req 3 FIX: Use handleManualAttendanceUpdate for student submission as well (Upsert)
-        // Pass a single item as a batch update
-        const updates = [{
+        const payload = new URLSearchParams({
+            action: 'saveAttendance',
             nisn: currentUser.nisn,
             nama: currentUser.nama,
             kelas: currentUser.kelas,
             jurusan: currentUser.jurusan,
-            date: CURRENT_DATE_WIB,
             status: status,
-            keterangan: keterangan || '-',
-            time: submissionTime,
-        }];
-
-        const payload = new URLSearchParams({
-            action: 'handleManualAttendanceUpdate', // Use the robust batch upsert action
-            updates: JSON.stringify(updates),
+            keterangan: keterangan,
             submittedBy: 'Siswa Mandiri'
         });
 
@@ -1771,15 +1732,15 @@
         hideModal(); 
 
         if (result && result.status === 'success') {
-            showModal('Absensi Berhasil!', `Data absensi berhasil dikirim. Status Anda: ${status}. Dikirim pada ${submissionTime || new Date().toLocaleTimeString('id-ID')} WIB.`, 'success', 3000);
-            selectTab('absensi'); 
+            const submissionTime = getTimeString(new Date());
+            showModal('Absensi Berhasil!', `Data absensi berhasil dikirim. Status Anda: ${status}. Dikirim pada ${submissionTime} WIB.`, 'success', 3000);
+            setTimeout(() => { selectTab('absensi'); }, 50);
         } else {
-            // Req 3 FIX: Improved error message details
-            showModal('Absensi Gagal!', result ? result.message : 'Terjadi kesalahan saat menyimpan data. Cek Apps Script logs untuk detail.', 'error', 5000);
+            showModal('Absensi Gagal!', result ? result.message : 'Terjadi kesalahan saat menyimpan data.', 'error', 5000);
         }
     }
     
-    // --- Teacher Recap Handlers (Logic not modified, dependent on GAS efficiency) ---
+    // --- Teacher Recap Handlers ---
 
     function setupTeacherRecapListeners() {
         const form = document.getElementById('teacher-recap-form');
@@ -1794,7 +1755,7 @@
         });
     }
 
-    // --- Teacher Comparison Handlers (Logic not modified, dependent on GAS efficiency) ---
+    // --- Teacher Comparison Handlers ---
 
     function setupTeacherComparisonListeners() {
         const form = document.getElementById('comparison-form');
@@ -1844,6 +1805,8 @@
                 if (keteranganValue) {
                     showMiniPopup('keterangan', keteranganInput, keteranganValue);
                 }
+            } else if (status === 'Hadir') {
+                showMiniPopup('hadir', e.target, 'Hadir');
             } else {
                 hideMiniPopup();
             }
@@ -1870,7 +1833,7 @@
         const submitForm = document.getElementById('manual-attendance-submit-form');
         
         submitForm.classList.add('hidden'); messageDiv.classList.remove('hidden');
-        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-indigo-500"></span></div><span class="ml-3 text-indigo-600 font-semibold">Memuat daftar siswa dan status absensi...</span></div>`;
+        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-indigo-500"></span></div><span class="ml-3 text-indigo-600">Memuat daftar siswa dan status absensi...</span></div>`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
         
         if (!kelas || !jurusan || !date) {
@@ -1885,8 +1848,11 @@
         if (result && result.status === 'success' && result.students) {
             studentListWithStatus = result.students;
         } else {
-             const msg = result ? result.message : 'Gagal memuat data siswa (Error tidak terduga).';
-             messageDiv.innerHTML = `<p class="font-semibold text-red-500">Error: ${msg}. Pastikan data di Apps Script sudah benar dan **REDEPLOY**.</p>`;
+             if (result && result.message && result.message.includes('Aksi tidak dikenali.')) {
+                 messageDiv.innerHTML = `<p class="font-semibold text-red-500">Error Server: Fungsi "getStudentListWithStatus" tidak ditemukan. Harap pastikan Anda telah menyimpan dan **REDEPLOY** Apps Script terbaru.</p>`;
+             } else {
+                 messageDiv.innerHTML = `<p class="font-semibold text-red-500">${result ? result.message : 'Gagal memuat data siswa (Error tidak terduga).'}</p>`;
+             }
              return;
         }
 
@@ -1897,7 +1863,7 @@
             submitForm.classList.remove('hidden');
         } else {
             messageDiv.classList.remove('hidden');
-            messageDiv.innerHTML = `<p class="font-semibold text-gray-700">Tidak ditemukan siswa di Kelas ${kelas} Jurusan ${jurusan}. Pastikan data di Sheet "Data Siswa" sudah benar.</p>`;
+            messageDiv.innerHTML = `<p class="font-semibold text-gray-700">Tidak ditemukan siswa di Kelas ${kelas} Jurusan ${jurusan}. Pastikan data di Sheet "DATA SISWA" sudah benar.</p>`;
         }
     }
 
@@ -1942,7 +1908,6 @@
         });
     }
 
-    // Req 3 FIX: Use Batch Upsert Logic
     async function handleSubmitManualAttendance(e) {
         e.preventDefault();
         
@@ -1957,15 +1922,12 @@
             const nisn = input.value;
             const status = form.querySelector(`select[name="status_${nisn}"]`).value;
             const keteranganInput = form.querySelector(`textarea[name="keterangan_${nisn}"]`);
-            // Only send valid keterangan if not Hadir/Alpha
-            const isKeteranganRequired = status === 'Izin' || status === 'Sakit';
-            const keterangan = isKeteranganRequired ? keteranganInput.value.trim() : '';
+            const keterangan = keteranganInput.disabled ? '' : keteranganInput.value.trim();
             
             const nama = form.querySelector(`input[name="nama_${nisn}"]`).value;
             const kelas = form.querySelector(`input[name="kelas_${nisn}"]`).value;
             const jurusan = form.querySelector(`input[name="jurusan_${nisn}"]`).value;
 
-            // Only record time if Hadir, otherwise send empty string
             const time = (status === 'Hadir') ? submissionTime : ''; 
 
             updates.push({ 
@@ -1979,7 +1941,7 @@
         showModal('Mengirim Data', 'Menyimpan absensi manual massal...', 'loading', 0);
 
         const payload = new URLSearchParams({
-            action: 'handleManualAttendanceUpdate', // This action MUST be implemented in GAS as an efficient UPSERT
+            action: 'handleManualAttendanceUpdate',
             updates: JSON.stringify(updates),
             submittedBy: currentUser.role
         });
@@ -1988,9 +1950,8 @@
         hideModal();
         
         if (result && result.status === 'success') {
-            showModal('Penyimpanan Berhasil', result.message || 'Absensi massal berhasil diperbarui.', 'success', 3000);
+            showModal('Penyimpanan Berhasil', 'Absensi massal berhasil diperbarui.', 'success', 3000);
             
-            // Reload list to show saved status
             const loadForm = document.getElementById('manual-attendance-form');
             if (loadForm) {
                  loadForm.dispatchEvent(new Event('submit'));
@@ -1999,8 +1960,7 @@
             }
 
         } else {
-            // Req 3 FIX: Improved error message details
-            showModal('Penyimpanan Gagal', result ? result.message : 'Terjadi kesalahan saat menyimpan data absensi massal. Periksa koneksi dan pastikan kode Apps Script sudah di-redeploy.', 'error', 5000);
+            showModal('Penyimpanan Gagal', result ? result.message : 'Terjadi kesalahan saat menyimpan data absensi massal. Pastikan fungsi Apps Script sudah di-redeploy.', 'error', 5000);
         }
     }
     
@@ -2016,7 +1976,7 @@
         const submitForm = document.getElementById('assessment-submit-form');
         
         submitForm.classList.add('hidden'); messageDiv.classList.remove('hidden');
-        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-green-500"></span></div><span class="ml-3 text-green-600 font-semibold">Memuat daftar siswa dan data nilai...</span></div>`;
+        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-green-500"></span></div><span class="ml-3 text-green-600">Memuat daftar siswa dan data nilai...</span></div>`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
         
         if (!kelas || !jurusan) {
@@ -2028,7 +1988,6 @@
             return;
         }
 
-        // Req 1 FIX: Send minimal parameters for efficiency
         const url = `${WEB_APP_URL}?action=getAssessmentList&kelas=${kelas}&jurusan=${jurusan}&type=${type}&date=${date}`;
         const result = await fetchData(url);
         
@@ -2068,21 +2027,14 @@
                     ${student.nisn}
                     <input type="hidden" name="nisn" value="${student.nisn}">
                     <input type="hidden" name="nama_${student.nisn}" value="${student.nama}">
-                    <input type="hidden" name="kelas_${student.nisn}" value="${student.kelas}"> 
-                    <input type="hidden" name="jurusan_${student.nisn}" value="${student.jurusan}">
+                    <input type="hidden" name="kelas_${student.nisn}" value="${kelas}">
+                    <input type="hidden" name="jurusan_${student.nisn}" value="${jurusan}">
                     <input type="hidden" name="type" value="${type}">
                     <input type="hidden" name="date" value="${date}">
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${student.nama}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm flex items-center space-x-2">
-                    <input type="number" id="score_input_${student.nisn}" name="score_${student.nisn}" min="0" max="100" value="${initialScore || ''}" placeholder="Nilai" class="w-24 text-center px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500">
-                    <!-- FIX 3: Tambahkan tombol simpan di samping input nilai -->
-                    <button type="button" 
-                            onclick="handleQuickSaveAssessment('${student.nisn}')" 
-                            class="quick-save-btn bg-green-500 hover:bg-green-600 text-white p-2 rounded-md transition duration-150 shadow-sm"
-                            title="Simpan Nilai Cepat">
-                        <span data-lucide="save" class="w-4 h-4 inline-block"></span>
-                    </button>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    <input type="number" name="score_${student.nisn}" min="0" max="100" value="${initialScore || ''}" placeholder="Nilai" class="w-24 text-center px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500">
                 </td>
             `;
             body.appendChild(row);
@@ -2132,53 +2084,6 @@
         tableBody.addEventListener('input', handleScoreInput); 
     }
 
-    // FIX 3: Tambahkan fungsi Quick Save per baris
-    async function handleQuickSaveAssessment(nisn) {
-        const row = document.querySelector(`input[name="nisn"][value="${nisn}"]`).closest('tr');
-        const scoreInput = row.querySelector(`#score_input_${nisn}`);
-        const score = scoreInput.value.trim();
-        const saveButton = row.querySelector('.quick-save-btn');
-
-        const type = document.getElementById('assessment-type').value;
-        const date = (type === 'harian') ? document.getElementById('assessment-date').value : '';
-        const kelas = row.querySelector(`input[name="kelas_${nisn}"]`).value; 
-        const jurusan = row.querySelector(`input[name="jurusan_${nisn}"]`).value;
-        const nama = row.querySelector(`input[name="nama_${nisn}"]`).value;
-
-        if (score === '' || parseInt(score) < 0 || parseInt(score) > 100) {
-            showModal('Validasi Nilai', 'Nilai harus antara 0 dan 100.', 'error', 3000);
-            return;
-        }
-
-        const updates = [{ nisn, nama, kelas, jurusan, score, }];
-
-        saveButton.innerHTML = `<div class="animate-spin"><span data-lucide="loader-circle" class="w-4 h-4"></span></div>`;
-        if (typeof lucide !== 'undefined') lucide.createIcons(); // Re-render loading icon
-        saveButton.setAttribute('disabled', 'disabled');
-
-        const payload = new URLSearchParams({
-            action: 'saveAssessmentBatch',
-            type: type,
-            date: date,
-            updates: JSON.stringify(updates),
-            submittedBy: currentUser.role
-        });
-
-        const result = await postData(payload);
-        
-        saveButton.removeAttribute('disabled');
-        saveButton.innerHTML = `<span data-lucide="save" class="w-4 h-4 inline-block"></span>`;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-
-        if (result && result.status === 'success') {
-            showModal('Penyimpanan Cepat Berhasil', `Nilai ${nama} berhasil disimpan.`, 'success', 1500);
-        } else {
-            showModal('Penyimpanan Cepat Gagal', result ? result.message : 'Terjadi kesalahan saat menyimpan data.', 'error', 3000);
-        }
-    }
-
-
-    // Req 3 FIX: Use Batch Upsert Logic
     async function handleSubmitAssessment(e) {
         e.preventDefault();
         
@@ -2191,15 +2096,13 @@
         nisnInputs.forEach(input => {
             const nisn = input.value;
             const score = form.querySelector(`input[name="score_${nisn}"]`).value.trim();
-            const kelas = form.querySelector(`input[name="kelas_${nisn}"]`).value;
-            const jurusan = form.querySelector(`input[name="jurusan_${nisn}"]`).value;
             
             if (score !== '') {
                 updates.push({ 
                     nisn: nisn, 
                     nama: form.querySelector(`input[name="nama_${nisn}"]`).value,
-                    kelas: kelas, 
-                    jurusan: jurusan, 
+                    kelas: form.querySelector(`input[name="kelas_${nisn}"]`).value,
+                    jurusan: form.querySelector(`input[name="jurusan_${nisn}"]`).value,
                     score: score,
                 });
             }
@@ -2214,7 +2117,7 @@
 
         // API call to GAS to save the batch update
         const payload = new URLSearchParams({
-            action: 'saveAssessmentBatch', // This action MUST be implemented in GAS as an efficient UPSERT
+            action: 'saveAssessmentBatch',
             type: type,
             date: date,
             updates: JSON.stringify(updates),
@@ -2225,9 +2128,9 @@
         hideModal();
         
         if (result && result.status === 'success') {
-            showModal('Penyimpanan Berhasil', result.message || `Nilai ${type.toUpperCase()} massal berhasil diperbarui.`, 'success', 3000);
+            showModal('Penyimpanan Berhasil', `Nilai ${type.toUpperCase()} massal berhasil diperbarui.`, 'success', 3000);
             
-            // Reload list to show saved status
+            // Refresh list setelah simpan
             const loadForm = document.getElementById('assessment-load-form');
             if (loadForm) {
                  loadForm.dispatchEvent(new Event('submit'));
@@ -2236,25 +2139,26 @@
             }
 
         } else {
-            // Req 3 FIX: Improved error message details
-            showModal('Penyimpanan Gagal', result ? result.message : 'Terjadi kesalahan saat menyimpan data. Periksa koneksi dan pastikan kode Apps Script sudah di-redeploy.', 'error', 5000);
+            showModal('Penyimpanan Gagal', result ? result.message : 'Terjadi kesalahan saat menyimpan data. Pastikan fungsi Apps Script sudah di-redeploy.', 'error', 5000);
         }
     }
     
     // --- Admin Management Handlers ---
     
-    // Req 1 FIX: Efficient loading (only fetch once) and then client-side filtering
     async function loadAllStudents(searchTerm = '', kelas = '', jurusan = '') {
         const tableBody = document.getElementById('admin-student-list-body');
         const messageDiv = document.getElementById('admin-management-message');
         const updateForm = document.getElementById('admin-student-update-form');
-        const bulkDeleteBtn = document.getElementById('bulk-delete-btn'); 
+        const bulkDeleteBtn = document.getElementById('bulk-delete-btn'); // NEW ELEMENT
         
         updateForm.classList.add('hidden');
-        messageDiv.classList.remove('hidden');
+        
+        // Update global filter state
+        currentFilterTerm = searchTerm;
+        currentFilterKelas = kelas;
+        currentFilterJurusan = jurusan;
 
         if (allStudentsData.length === 0) {
-             messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-purple-500"></span></div><span class="ml-3 text-purple-600 font-semibold">Mengambil semua data siswa dari Sheet...</span></div>`;
             const url = `${WEB_APP_URL}?action=getAllStudents`;
             const result = await fetchData(url);
             
@@ -2263,12 +2167,11 @@
             } else {
                 console.error("Gagal memuat semua data siswa:", result);
                 messageDiv.innerHTML = `<p class="font-semibold text-red-500">Gagal memuat semua data siswa. Pastikan fungsi 'getAllStudents' sudah di-redeploy di Apps Script.</p>`;
-                if (bulkDeleteBtn) bulkDeleteBtn.setAttribute('disabled', 'disabled'); 
+                if (bulkDeleteBtn) bulkDeleteBtn.setAttribute('disabled', 'disabled'); // Disable if load fails
                 return;
             }
         }
 
-        // Client-side filtering for speed after initial full load
         const filteredStudents = allStudentsData.filter(student => {
             const studentNama = (student.nama || '').toLowerCase();
             const studentNisn = (student.nisn || '').toLowerCase();
@@ -2287,24 +2190,14 @@
         if (filteredStudents.length > 0) {
             messageDiv.classList.add('hidden');
             updateForm.classList.remove('hidden');
-            if (bulkDeleteBtn) {
-                 bulkDeleteBtn.removeAttribute('disabled');
-                 bulkDeleteBtn.innerHTML = `<span data-lucide="trash-2" class="w-4 h-4 mr-2"></span> Hapus ${currentFilteredStudentCount} Data`;
-            }
+            if (bulkDeleteBtn) bulkDeleteBtn.removeAttribute('disabled'); // Enable if items found
         } else if (allStudentsData.length > 0) {
             messageDiv.classList.remove('hidden');
-            messageDiv.innerHTML = `<p class="font-semibold text-gray-700">Tidak ada data siswa yang cocok dengan filter Anda. (${allStudentsData.length} total siswa).</p>`;
-            if (bulkDeleteBtn) {
-                 bulkDeleteBtn.setAttribute('disabled', 'disabled');
-                 bulkDeleteBtn.innerHTML = `<span data-lucide="trash-2" class="w-4 h-4 mr-2"></span> Hapus Data`;
-            }
+            messageDiv.innerHTML = `<p class="font-semibold text-gray-700">Tidak ada data siswa yang cocok dengan filter Anda.</p>`;
+            if (bulkDeleteBtn) bulkDeleteBtn.setAttribute('disabled', 'disabled'); // Disable if no items found
         } else {
-             if (bulkDeleteBtn) {
-                 bulkDeleteBtn.setAttribute('disabled', 'disabled');
-                 bulkDeleteBtn.innerHTML = `<span data-lucide="trash-2" class="w-4 h-4 mr-2"></span> Hapus Data`;
-            }
+             if (bulkDeleteBtn) bulkDeleteBtn.setAttribute('disabled', 'disabled'); // Disable if total data is 0
         }
-         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     function renderAdminStudentTable(students) {
@@ -2326,9 +2219,10 @@
                         <input type="text" name="kelas_${s.nisn}" value="${s.kelas || ''}" class="w-20 text-center px-2 py-1 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <input type="text" name="jurusan_${s.nisn}" value="${s.jurusan || ''}" class="w-full text-center px-2 py-1 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                        <input type="text" name="jurusan_${s.nisn}" value="${s.jurusan || ''}" class="w-28 text-center px-2 py-1 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <!-- Perbaikan 1: Mengubah type menjadi text untuk mendukung karakter '-' -->
                         <input type="text" name="email_${s.nisn}" value="${s.email || ''}" 
                                pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
                                class="w-full px-2 py-1 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
@@ -2349,9 +2243,12 @@
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
     
+    // NEW: Fungsi untuk menghapus siswa
     function handleDeleteStudent(nisn) {
-        // Since we are not using custom modal (as per original code), we use window.confirm
-        if (window.confirm(`Apakah Anda yakin ingin menghapus siswa dengan NISN: ${nisn}? Aksi ini TIDAK dapat dibatalkan dan akan MENGHAPUS data dari Google Sheet.`)) {
+        // Pada aplikasi live, ini akan memunculkan modal konfirmasi
+        const isConfirmed = window.confirm(`Apakah Anda yakin ingin menghapus siswa dengan NISN: ${nisn}? Aksi ini tidak dapat dibatalkan.`);
+        
+        if (isConfirmed) {
             // Lakukan panggilan API ke Apps Script untuk menghapus
             showModal('Menghapus Data', `Menghapus siswa NISN ${nisn}...`, 'loading', 0);
             
@@ -2362,16 +2259,11 @@
 
             postData(payload).then(result => {
                 hideModal();
-                if (result && result.status === 'success') { 
+                if (result && result.status === 'success') {
                     showModal('Penghapusan Berhasil', result.message || `Siswa NISN ${nisn} berhasil dihapus.`, 'success', 3000);
-                    // Clear cache and reload table
+                    // Clear cache dan reload tabel
                     allStudentsData = [];
-                    const filterForm = document.getElementById('admin-management-form');
-                    if (filterForm) {
-                        filterForm.dispatchEvent(new Event('submit'));
-                    } else {
-                        selectTab('manajemen');
-                    }
+                    document.getElementById('admin-management-form').dispatchEvent(new Event('submit'));
                 } else {
                     showModal('Penghapusan Gagal', result ? result.message : 'Terjadi kesalahan saat menghapus data.', 'error', 5000);
                 }
@@ -2393,7 +2285,7 @@
         showModal('Menghapus Data', `Menghapus ${currentFilteredStudentCount} siswa berdasarkan filter... Proses ini mungkin memakan waktu.`, 'loading', 0);
         
         const payload = new URLSearchParams({
-            action: 'deleteStudentsByFilter', // New action for Apps Script (must be implemented as efficient batch deletion)
+            action: 'deleteStudentsByFilter', // New action for Apps Script
             searchTerm: currentFilterTerm,
             kelas: currentFilterKelas,
             jurusan: currentFilterJurusan
@@ -2425,6 +2317,7 @@
         const email = form.querySelector('#new-email').value.trim();
         const password = form.querySelector('#new-password').value.trim();
 
+        // Basic validation
         if (!nisn || !nama || !kelas || !jurusan || !email || !password) {
             showModal('Validasi Gagal', 'Semua field wajib diisi.', 'error', 3000);
             return;
@@ -2434,7 +2327,7 @@
         showModal('Menambah Data', `Menambahkan siswa baru: ${nama}...`, 'loading', 0);
 
         const payload = new URLSearchParams({
-            action: 'addStudent', // This action MUST be implemented in GAS as efficient append
+            action: 'addStudent',
             nisn, nama, kelas, jurusan, email, password
         });
 
@@ -2443,7 +2336,7 @@
 
         if (result && result.status === 'success') {
             showModal('Penambahan Berhasil', result.message || `Siswa ${nama} berhasil ditambahkan.`, 'success', 3000);
-            // Clear cache and reload table
+            // Clear cache dan reload tabel
             allStudentsData = [];
             document.getElementById('admin-management-form').dispatchEvent(new Event('submit'));
         } else {
@@ -2471,7 +2364,7 @@
             
             document.getElementById('admin-student-list-body').innerHTML = '';
             document.getElementById('admin-management-message').classList.remove('hidden');
-            document.getElementById('admin-management-message').innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-purple-500"></span></div><span class="ml-3 text-purple-600 font-semibold">Memproses filter...</span></div>`;
+            document.getElementById('admin-management-message').innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-purple-500"></span></div><span class="ml-3 text-purple-600">Memproses filter...</span></div>`;
             if (typeof lucide !== 'undefined') lucide.createIcons();
 
             loadAllStudents(searchTerm, kelas, jurusan);
@@ -2510,7 +2403,7 @@
         showModal('Mengirim Data', 'Menyimpan perubahan data siswa massal...', 'loading', 0);
 
         const payload = new URLSearchParams({
-            action: 'updateStudentDataBatch', // This action MUST be implemented in GAS as efficient UPSERT
+            action: 'updateStudentDataBatch',
             updates: JSON.stringify(updates),
         });
 
@@ -2534,7 +2427,7 @@
         }
     }
 
-    // --- Admin Configuration Handlers (Logic not modified) ---
+    // --- Admin Configuration Handlers ---
 
     function setupAdminConfigurationListeners() {
         const form = document.getElementById('admin-config-form');
@@ -2584,7 +2477,7 @@
         });
     }
 
-    // --- Admin Recap Listener (Logic not modified) ---
+    // --- Admin Recap Listener ---
 
     function setupAdminRecapListeners() {
         const form = document.getElementById('admin-recap-form');
@@ -2601,6 +2494,7 @@
     
     // --- FINAL INITIALIZATION BLOCK ---
     
+    // NEW: Login Form Handler moved here
     document.getElementById('login-form').addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -2617,7 +2511,6 @@
 
         showModal('Otentikasi', 'Memverifikasi kredensial...', 'loading');
 
-        // Req 1 FIX: Send minimal parameters for efficiency
         const url = `${WEB_APP_URL}?action=login&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&role=${currentRole}`;
         const result = await fetchData(url);
         
@@ -2641,7 +2534,7 @@
         
         renderRoleSelection();
 
-        const loaded = loadAppState(); // FIX BUG: Memuat state saat DOM content loaded
+        const loaded = loadAppState();
         if (!loaded) {
             // Biarkan halaman login/pilihan peran ditampilkan
         }
@@ -2670,3 +2563,4 @@
 </script>
 </body>
 </html>
+
