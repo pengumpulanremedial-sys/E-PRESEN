@@ -2070,7 +2070,8 @@
             
             const loadForm = document.getElementById('manual-attendance-form');
             if (loadForm) {
-                 loadForm.dispatchEvent(new Event('submit'));
+                 // FIX: Tambahkan delay 50ms untuk sinkronisasi data Apps Script
+                 setTimeout(() => loadForm.dispatchEvent(new Event('submit')), 50); 
             } else {
                  selectTab('absensi-siswa'); 
             }
@@ -2253,7 +2254,8 @@
             // Refresh list setelah simpan
             const loadForm = document.getElementById('assessment-load-form');
             if (loadForm) {
-                 loadForm.dispatchEvent(new Event('submit'));
+                 // FIX: Tambahkan delay 50ms untuk sinkronisasi data Apps Script
+                 setTimeout(() => loadForm.dispatchEvent(new Event('submit')), 50);
             } else {
                  selectTab('penilaian');
             }
@@ -2390,7 +2392,8 @@
                     showModal('Penghapusan Berhasil', result.message || `Siswa NISN ${nisn} berhasil dihapus.`, 'success', 3000);
                     // Clear cache dan reload tabel
                     allStudentsData = [];
-                    document.getElementById('admin-management-form').dispatchEvent(new Event('submit'));
+                     // FIX: Tambahkan delay 50ms untuk sinkronisasi data Apps Script
+                    setTimeout(() => document.getElementById('admin-management-form').dispatchEvent(new Event('submit')), 50);
                 } else {
                     showModal('Penghapusan Gagal', result ? result.message : 'Terjadi kesalahan saat menghapus data.', 'error', 5000);
                 }
@@ -2428,7 +2431,8 @@
                     
                     // Clear local cache and reload table to reflect changes
                     allStudentsData = [];
-                    document.getElementById('admin-management-form').dispatchEvent(new Event('submit'));
+                    // FIX: Tambahkan delay 50ms untuk sinkronisasi data Apps Script
+                    setTimeout(() => document.getElementById('admin-management-form').dispatchEvent(new Event('submit')), 50);
                 } else {
                     showModal('Penghapusan Gagal', result ? result.message : 'Terjadi kesalahan saat menghapus data. Pastikan fungsi Apps Script sudah di-redeploy.', 'error', 5000);
                 }
@@ -2469,7 +2473,8 @@
             showModal('Penambahan Berhasil', result.message || `Siswa ${nama} berhasil ditambahkan.`, 'success', 3000);
             // Clear cache dan reload tabel
             allStudentsData = [];
-            document.getElementById('admin-management-form').dispatchEvent(new Event('submit'));
+            // FIX: Tambahkan delay 50ms untuk sinkronisasi data Apps Script
+            setTimeout(() => document.getElementById('admin-management-form').dispatchEvent(new Event('submit')), 50);
         } else {
             showModal('Penambahan Gagal', result ? result.message : 'Terjadi kesalahan saat menambahkan data. NISN mungkin sudah terdaftar.', 'error', 5000);
             openAddStudentModal(); // Buka kembali modal agar user bisa perbaiki
@@ -2548,7 +2553,8 @@
             allStudentsData = []; 
             const filterForm = document.getElementById('admin-management-form');
             if (filterForm) {
-                 filterForm.dispatchEvent(new Event('submit'));
+                 // FIX: Tambahkan delay 50ms untuk sinkronisasi data Apps Script
+                 setTimeout(() => filterForm.dispatchEvent(new Event('submit')), 50);
             } else {
                  selectTab('manajemen');
             }
