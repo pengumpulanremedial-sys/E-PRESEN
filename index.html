@@ -2054,8 +2054,8 @@
                     ${student.nisn}
                     <input type="hidden" name="nisn" value="${student.nisn}">
                     <input type="hidden" name="nama_${student.nisn}" value="${student.nama}">
-                    <input type="hidden" name="kelas_${student.nisn}" value="${kelas}">
-                    <input type="hidden" name="jurusan_${student.nisn}" value="${jurusan}">
+                    <input type="hidden" name="kelas_${student.nisn}" value="${student.kelas}"> <!-- Menggunakan student.kelas/jurusan yang berasal dari master data siswa -->
+                    <input type="hidden" name="jurusan_${student.nisn}" value="${student.jurusan}">
                     <input type="hidden" name="type" value="${type}">
                     <input type="hidden" name="date" value="${date}">
                 </td>
@@ -2127,7 +2127,8 @@
 
         const type = document.getElementById('assessment-type').value;
         const date = (type === 'harian') ? document.getElementById('assessment-date').value : '';
-        const kelas = row.querySelector(`input[name="kelas_${nisn}"]`).value;
+        // Ambil kelas/jurusan dari input hidden di baris tabel (sudah diisi dari master data)
+        const kelas = row.querySelector(`input[name="kelas_${nisn}"]`).value; 
         const jurusan = row.querySelector(`input[name="jurusan_${nisn}"]`).value;
         const nama = row.querySelector(`input[name="nama_${nisn}"]`).value;
 
@@ -2136,6 +2137,7 @@
             return;
         }
 
+        // FIX Poin 2: Mengirim kelas dan jurusan
         const updates = [{ nisn, nama, kelas, jurusan, score, }];
 
         saveButton.innerHTML = `<div class="animate-spin"><span data-lucide="loader-circle" class="w-4 h-4"></span></div>`;
@@ -2176,13 +2178,16 @@
         nisnInputs.forEach(input => {
             const nisn = input.value;
             const score = form.querySelector(`input[name="score_${nisn}"]`).value.trim();
+            // FIX Poin 2: Mengambil Kelas dan Jurusan dari input hidden
+            const kelas = form.querySelector(`input[name="kelas_${nisn}"]`).value;
+            const jurusan = form.querySelector(`input[name="jurusan_${nisn}"]`).value;
             
             if (score !== '') {
                 updates.push({ 
                     nisn: nisn, 
                     nama: form.querySelector(`input[name="nama_${nisn}"]`).value,
-                    kelas: form.querySelector(`input[name="kelas_${nisn}"]`).value,
-                    jurusan: form.querySelector(`input[name="jurusan_${nisn}"]`).value,
+                    kelas: kelas, // FIX Poin 2
+                    jurusan: jurusan, // FIX Poin 2
                     score: score,
                 });
             }
