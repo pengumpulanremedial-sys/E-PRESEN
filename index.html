@@ -8,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com/"></script>
     <!-- Lucide Icons for aesthetic icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- NEW: Chart.js CDN for interactive charts -->
+    <!-- Chart.js CDN for interactive charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
@@ -31,7 +31,7 @@
         }
         /* CSS untuk menyembunyikan elemen non-cetak saat window.print() dipanggil */
         @media print {
-            header, nav, .flex.justify-end, .page:not(#dashboard-container), h2, .bg-purple-50, .bg-indigo-50 {
+            header, nav, .flex.justify-end, .page:not(#dashboard-container), h2, .bg-purple-50, .bg-indigo-50, #modal-message, #mini-popup, #dashboard-tabs {
                 display: none !important;
             }
             main {
@@ -42,10 +42,16 @@
             #tab-content {
                 box-shadow: none !important;
                 border: none !important;
+                /* Cetak semua isi, bukan hanya yang terlihat */
+                overflow: visible !important;
+                min-height: auto !important;
             }
-            /* Pastikan modal untuk menambah siswa tersembunyi */
-            #add-student-modal {
-                display: none !important;
+            /* Pastikan tabel terlihat jelas saat dicetak */
+            table {
+                font-size: 10pt;
+            }
+            thead {
+                display: table-header-group;
             }
         }
     </style>
@@ -144,14 +150,17 @@
         </div>
     </main>
 
-    <!-- Modal for Loading/Success Messages -->
+    <!-- Modal for Loading/Success Messages/Confirmation (Perbaikan 1) -->
     <div id="modal-message" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden transition-opacity duration-300">
-        <div class="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full text-center transform scale-100 transition-transform duration-300">
+        <div id="modal-content" class="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full text-center transform scale-100 transition-transform duration-300">
             <div id="modal-icon" class="mb-4 text-indigo-600">
                 <!-- Icon will be placed here -->
             </div>
             <h3 id="modal-title" class="text-xl font-bold mb-3 text-gray-800"></h3>
             <p id="modal-body" class="text-gray-600"></p>
+            <div id="modal-actions" class="mt-5 flex justify-end space-x-3 hidden">
+                <!-- Buttons for confirmation/cancellation will be placed here by showConfirm -->
+            </div>
         </div>
     </div>
     
@@ -193,12 +202,16 @@
                     </div>
                     <div>
                         <label for="new-jurusan" class="block text-sm font-medium text-gray-700">Jurusan <span class="text-red-500">*</span></label>
-                        <input type="text" id="new-jurusan" name="jurusan" required placeholder="Contoh: RPL" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                        <select id="new-jurusan" name="jurusan" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">-- Pilih Jurusan --</option>
+                            <option value="RPL">RPL (Rekayasa Perangkat Lunak)</option>
+                            <option value="TKJ">TKJ (Teknik Komputer Jaringan)</option>
+                            <option value="TKR">TKR (Teknik Kendaraan Ringan)</option>
+                        </select>
                     </div>
                 </div>
                 <div>
                     <label for="new-email" class="block text-sm font-medium text-gray-700">Email <span class="text-red-500">*</span></label>
-                    <!-- Perbaikan 1: Menggunakan type="text" dengan pattern untuk karakter '-' -->
                     <input type="text" id="new-email" name="email" required 
                            placeholder="email@sekolah.sch.id (Mengizinkan strip/hyphen)" 
                            pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
@@ -286,7 +299,7 @@
 
 
     // ====================================================================
-    // --- 2. UTILITY & MODAL FUNCTIONS (Semua harus ada di atas) ---
+    // --- 2. UTILITY & MODAL FUNCTIONS --- (Perbaikan 1: Modal interaktif)
     // ====================================================================
 
     function getTimeString(dateObj) {
@@ -349,13 +362,20 @@
         document.getElementById(pageId).classList.remove('hidden');
     }
 
-    function showModal(title, body, type, duration = 0) {
+    function hideModal() {
+        document.getElementById('modal-message').classList.add('hidden');
+    }
+    
+    function showModal(title, body, type, duration = 0, customIcon = null) {
         const modal = document.getElementById('modal-message');
         const iconDiv = document.getElementById('modal-icon');
         const titleEl = document.getElementById('modal-title');
         const bodyEl = document.getElementById('modal-body');
+        const actionsEl = document.getElementById('modal-actions');
         
         hideMiniPopup(); 
+        actionsEl.innerHTML = '';
+        actionsEl.classList.add('hidden'); 
 
         let iconHtml = '';
         let colorClass = 'text-indigo-600';
@@ -364,11 +384,14 @@
             iconHtml = `<div class="animate-spin"><span data-lucide="loader-circle" class="w-10 h-10 mx-auto"></span></div>`;
             colorClass = 'text-indigo-600';
         } else if (type === 'success') {
-            iconHtml = `<span data-lucide="check-circle" class="w-10 h-10 mx-auto text-emerald-500"></span>`;
+            iconHtml = `<span data-lucide="${customIcon || 'check-circle'}" class="w-10 h-10 mx-auto text-emerald-500"></span>`;
             colorClass = 'text-emerald-500';
         } else if (type === 'error') {
-            iconHtml = `<span data-lucide="x-circle" class="w-10 h-10 mx-auto text-red-500"></span>`;
+            iconHtml = `<span data-lucide="${customIcon || 'x-circle'}" class="w-10 h-10 mx-auto text-red-500"></span>`;
             colorClass = 'text-red-500';
+        } else if (type === 'info') {
+             iconHtml = `<span data-lucide="${customIcon || 'info'}" class="w-10 h-10 mx-auto text-blue-500"></span>`;
+            colorClass = 'text-blue-500';
         }
 
         iconDiv.innerHTML = iconHtml;
@@ -388,10 +411,40 @@
             }, duration);
         }
     }
+    
+    function showConfirm(title, body, onConfirm) {
+        const modal = document.getElementById('modal-message');
+        const iconDiv = document.getElementById('modal-icon');
+        const titleEl = document.getElementById('modal-title');
+        const bodyEl = document.getElementById('modal-body');
+        const actionsEl = document.getElementById('modal-actions');
+        
+        hideMiniPopup();
+        
+        // Setup content
+        iconDiv.innerHTML = `<span data-lucide="alert-triangle" class="w-10 h-10 mx-auto text-amber-500"></span>`;
+        titleEl.innerText = title;
+        titleEl.className = `text-xl font-bold mb-3 text-amber-600`;
+        bodyEl.innerText = body;
+        
+        // Setup buttons
+        actionsEl.innerHTML = `
+            <button id="confirm-cancel" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150">Batal</button>
+            <button id="confirm-ok" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-xl transition duration-150">Ya, Hapus/Lanjut</button>
+        `;
+        actionsEl.classList.remove('hidden');
 
-    function hideModal() {
-        document.getElementById('modal-message').classList.add('hidden');
+        // Add event listeners
+        document.getElementById('confirm-cancel').onclick = hideModal;
+        document.getElementById('confirm-ok').onclick = () => {
+            hideModal();
+            onConfirm();
+        };
+
+        modal.classList.remove('hidden');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
+
 
     // NEW: Fungsi untuk menampilkan/menyembunyikan modal tambah siswa
     function openAddStudentModal() {
@@ -593,7 +646,6 @@
     // --- 4. CORE LOGIC (LOGIN, NAVIGATION, STATE) ---
     // ====================================================================
     
-    // FIX: renderDashboardTabs dan renderTabContent dipindahkan ke atas
     function renderDashboardTabs() {
         const tabsContainer = document.querySelector('#dashboard-tabs nav');
         tabsContainer.innerHTML = '';
@@ -715,11 +767,15 @@
         if (savedState) {
             try {
                 const state = JSON.parse(savedState);
-                if (state.user && state.role && state.tab) {
+                // Menambahkan pemeriksaan tanggal hari ini untuk menghindari masalah cache data hari sebelumnya
+                const today = new Date().toISOString().split('T')[0];
+                if (state.lastLoginDate === today && state.user && state.role && state.tab) {
                     currentUser = state.user;
                     currentRole = state.role;
                     initializeDashboard(state.tab);
                     return true;
+                } else {
+                    localStorage.removeItem('absensiAppState');
                 }
             } catch (e) {
                 console.error("Gagal memuat status aplikasi dari localStorage:", e);
@@ -734,6 +790,7 @@
             localStorage.setItem('absensiAppState', JSON.stringify({
                 role: currentUser.role,
                 tab: currentTab,
+                lastLoginDate: new Date().toISOString().split('T')[0], // Save current date
                 user: {
                     nisn: currentUser.nisn, nip: currentUser.nip, nama: currentUser.nama,
                     kelas: currentUser.kelas, jurusan: currentUser.jurusan,
@@ -768,7 +825,7 @@
 
         allStudentsData = []; currentRecapData = [];
         currentUser = null; currentRole = null; currentTab = '';
-        saveAppState();
+        saveAppState(); // Removes state
 
         showPage('entry-page');
         document.getElementById('username').value = '';
@@ -1527,6 +1584,42 @@
         `;
     }
 
+    function renderAdminConfiguration() {
+         return `
+            <h3 class="text-2xl font-bold text-gray-700 mb-6">Konfigurasi Aplikasi</h3>
+            <p class="text-gray-500 mb-6">Perbarui detail sekolah yang ditampilkan di header aplikasi.</p>
+            <div class="bg-indigo-50 p-6 rounded-xl shadow-inner mb-8">
+                <form id="admin-config-form" class="space-y-6">
+                    <div>
+                        <label for="config-school-name" class="block text-sm font-medium text-gray-700">Nama Sekolah</label>
+                        <input type="text" id="config-school-name" value="${APP_CONFIG.SCHOOL_NAME}" required placeholder="Contoh: SMK Sehati Karawang" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="config-logo-url" class="block text-sm font-medium text-gray-700">URL Logo Sekolah (Link Langsung)</label>
+                        <input type="url" id="config-logo-url" value="${APP_CONFIG.LOGO_URL}" required placeholder="Contoh: https://link-gambar-logo-anda.png" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                        <p class="text-xs text-gray-500 mt-1">Gunakan link langsung (Direct Link) untuk menghindari error.</p>
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center">
+                            <span data-lucide="save" class="w-4 h-4 mr-2"></span> Simpan Konfigurasi
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="bg-gray-100 p-6 rounded-xl shadow-md space-y-4">
+                <h4 class="text-lg font-bold text-gray-700">Opsi Alternatif: Logo Base64</h4>
+                <div>
+                    <label for="config-logo-base64" class="block text-sm font-medium text-gray-700">Tempel String Base64 Gambar</label>
+                    <textarea id="config-logo-base64" rows="3" placeholder="Contoh: data:image/png;base64,iVBORw0KGgoAAAAN..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 resize-none"></textarea>
+                </div>
+                <button id="apply-base64-btn" type="button" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center">
+                    <span data-lucide="image" class="w-4 h-4 mr-2"></span> Terapkan Logo dari Base64
+                </button>
+            </div>
+        `;
+    }
+
     function renderAdminGlobalRecap() {
         const allClasses = currentUser.kelasAjar || [];
         const allMajors = currentUser.jurusanAjar || [];
@@ -1607,7 +1700,7 @@
             <p id="admin-management-message" class="text-center text-gray-500 py-10">Memuat data siswa...</p>
             
             <form id="admin-student-update-form" class="hidden">
-                 <div class="flex flex-col space-y-3 md:flex-row justify-between items-center mb-4 md:space-y-0">
+                   <div class="flex flex-col space-y-3 md:flex-row justify-between items-center mb-4 md:space-y-0">
                     <button type="button" onclick="openAddStudentModal()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center">
                         <span data-lucide="user-plus" class="w-4 h-4 mr-2"></span> Tambah Siswa Baru
                     </button>
@@ -1618,7 +1711,7 @@
                         </button>
                         <!-- NEW BULK DELETE BUTTON (Perbaikan 3) -->
                         <button onclick="handleDeleteFilteredStudents()" type="button" id="bulk-delete-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center disabled:opacity-50" disabled>
-                            <span data-lucide="trash-2" class="w-4 h-4 mr-2"></span> Hapus Berdasarkan Filter
+                            <span data-lucide="trash-2" class="w-4 h-4 mr-2"></span> Hapus Berdasarkan Filter (<span id="filtered-count">0</span>)
                         </button>
                     </div>
                 </div>
@@ -1641,7 +1734,7 @@
                         </tbody>
                     </table>
                 </div>
-                   <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 flex items-center justify-center">
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 flex items-center justify-center">
                     <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Perubahan Data Massal
                 </button>
             </form>
@@ -1793,11 +1886,16 @@
                 keteranganInput.setAttribute('disabled', 'disabled');
                 keteranganInput.classList.add('bg-gray-100');
                 if (status === 'Alpha') {
-                    keteranganInput.value = ''; 
+                    keteranganInput.value = 'Alfa'; // Set default ket for Alpha
+                } else if (status === 'Hadir') {
+                    keteranganInput.value = '-'; // Set default ket for Hadir
                 }
             } else {
                 keteranganInput.removeAttribute('disabled');
                 keteranganInput.classList.remove('bg-gray-100');
+                if (keteranganInput.value === 'Alfa' || keteranganInput.value === '-') {
+                    keteranganInput.value = '';
+                }
             }
             
             if (status === 'Izin' || status === 'Sakit') {
@@ -1884,8 +1982,14 @@
             });
             statusSelect += `</select>`;
             
+            // Perbaikan logic: Jika status Hadir/Alpha, kolom keterangan harus didisable.
             const isKeteranganDisabled = student.status === 'Hadir' || student.status === 'Alpha';
             const keteranganClass = isKeteranganDisabled ? 'bg-gray-100' : '';
+            // Perbaikan logic: Pastikan Hadir/Alpha memiliki default '-' atau 'Alfa' di UI (meski di Apps Script akan diabaikan)
+            let initialKeterangan = student.keterangan === '-' ? '' : student.keterangan || '';
+            if (student.status === 'Alpha' && initialKeterangan === '') initialKeterangan = 'Alfa';
+            if (student.status === 'Hadir' && initialKeterangan === '') initialKeterangan = '-';
+
 
             row.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -1901,7 +2005,7 @@
                     ${statusSelect}
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-500">
-                    <textarea name="keterangan_${student.nisn}" rows="1" placeholder="Keterangan (jika Izin/Sakit)" class="w-full px-3 py-2 border rounded-md resize-none ${keteranganClass}" ${isKeteranganDisabled ? 'disabled' : ''}>${student.keterangan === '-' ? '' : student.keterangan || ''}</textarea>
+                    <textarea name="keterangan_${student.nisn}" rows="1" placeholder="Keterangan (jika Izin/Sakit)" class="w-full px-3 py-2 border rounded-md resize-none ${keteranganClass}" ${isKeteranganDisabled ? 'disabled' : ''}>${initialKeterangan}</textarea>
                 </td>
             `;
             body.appendChild(row);
@@ -1922,17 +2026,29 @@
             const nisn = input.value;
             const status = form.querySelector(`select[name="status_${nisn}"]`).value;
             const keteranganInput = form.querySelector(`textarea[name="keterangan_${nisn}"]`);
-            const keterangan = keteranganInput.disabled ? '' : keteranganInput.value.trim();
             
+            // Perbaikan: Pastikan kita mengambil nilai yang benar (bukan hanya status disabled)
+            let keterangan = keteranganInput.value.trim();
+            
+            // Logic perbaikan bug: Jika Hadir/Alpha, kosongkan keterangan sebelum dikirim
+            if (status === 'Hadir' || status === 'Alpha') {
+                keterangan = '-'; 
+            } else if (keterangan === '') {
+                 // Wajib isi jika Izin/Sakit, tapi jika kosong, berikan feedback di Apps Script
+                 keterangan = '-'; 
+            }
+
+
             const nama = form.querySelector(`input[name="nama_${nisn}"]`).value;
             const kelas = form.querySelector(`input[name="kelas_${nisn}"]`).value;
             const jurusan = form.querySelector(`input[name="jurusan_${nisn}"]`).value;
 
+            // Perbaikan Logic: Waktu hanya diisi jika statusnya 'Hadir'
             const time = (status === 'Hadir') ? submissionTime : ''; 
 
             updates.push({ 
                 nisn, nama, kelas, jurusan, date: dateInput, status, 
-                keterangan: keterangan || '-', time: time,
+                keterangan: keterangan, time: time,
             });
         });
         
@@ -2095,9 +2211,10 @@
         
         nisnInputs.forEach(input => {
             const nisn = input.value;
-            const score = form.querySelector(`input[name="score_${nisn}"]`).value.trim();
+            const scoreInput = form.querySelector(`input[name="score_${nisn}"]`);
+            const score = scoreInput.value.trim();
             
-            if (score !== '') {
+            if (score !== '' && parseInt(score) >= 0 && parseInt(score) <= 100) {
                 updates.push({ 
                     nisn: nisn, 
                     nama: form.querySelector(`input[name="nama_${nisn}"]`).value,
@@ -2105,11 +2222,14 @@
                     jurusan: form.querySelector(`input[name="jurusan_${nisn}"]`).value,
                     score: score,
                 });
+            } else if (score !== '') {
+                 // Beri tahu user jika ada nilai tidak valid
+                 showModal('Validasi Nilai', `Nilai siswa NISN ${nisn} (${score}) harus antara 0 dan 100. Data ini akan diabaikan.`, 'error', 5000);
             }
         });
         
         if (updates.length === 0) {
-            showModal('Peringatan', 'Tidak ada nilai yang diisi untuk disimpan.', 'error', 3000);
+            showModal('Peringatan', 'Tidak ada nilai valid yang diisi untuk disimpan (Harus antara 0-100).', 'error', 3000);
             return;
         }
         
@@ -2149,7 +2269,8 @@
         const tableBody = document.getElementById('admin-student-list-body');
         const messageDiv = document.getElementById('admin-management-message');
         const updateForm = document.getElementById('admin-student-update-form');
-        const bulkDeleteBtn = document.getElementById('bulk-delete-btn'); // NEW ELEMENT
+        const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
+        const filteredCountSpan = document.getElementById('filtered-count');
         
         updateForm.classList.add('hidden');
         
@@ -2157,6 +2278,11 @@
         currentFilterTerm = searchTerm;
         currentFilterKelas = kelas;
         currentFilterJurusan = jurusan;
+
+        // Display loading message
+        messageDiv.classList.remove('hidden');
+        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-purple-500"></span></div><span class="ml-3 text-purple-600">Memuat data siswa...</span></div>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
 
         if (allStudentsData.length === 0) {
             const url = `${WEB_APP_URL}?action=getAllStudents`;
@@ -2167,7 +2293,8 @@
             } else {
                 console.error("Gagal memuat semua data siswa:", result);
                 messageDiv.innerHTML = `<p class="font-semibold text-red-500">Gagal memuat semua data siswa. Pastikan fungsi 'getAllStudents' sudah di-redeploy di Apps Script.</p>`;
-                if (bulkDeleteBtn) bulkDeleteBtn.setAttribute('disabled', 'disabled'); // Disable if load fails
+                if (bulkDeleteBtn) bulkDeleteBtn.setAttribute('disabled', 'disabled'); 
+                filteredCountSpan.textContent = '0';
                 return;
             }
         }
@@ -2198,6 +2325,7 @@
         } else {
              if (bulkDeleteBtn) bulkDeleteBtn.setAttribute('disabled', 'disabled'); // Disable if total data is 0
         }
+        filteredCountSpan.textContent = currentFilteredStudentCount;
     }
 
     function renderAdminStudentTable(students) {
@@ -2231,7 +2359,7 @@
                         <input type="password" name="password_${s.nisn}" value="${s.password || ''}" placeholder="Kosongkan untuk tetap" class="w-full px-2 py-1 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <button type="button" onclick="handleDeleteStudent('${s.nisn}')" class="text-red-600 hover:text-red-900">
+                        <button type="button" onclick="handleDeleteStudent('${s.nisn}', '${s.nama}')" class="text-red-600 hover:text-red-900">
                             <span data-lucide="trash-2" class="w-4 h-4 inline-block"></span>
                         </button>
                     </td>
@@ -2243,21 +2371,20 @@
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
     
-    // NEW: Fungsi untuk menghapus siswa
-    function handleDeleteStudent(nisn) {
-        // Pada aplikasi live, ini akan memunculkan modal konfirmasi
-        const isConfirmed = window.confirm(`Apakah Anda yakin ingin menghapus siswa dengan NISN: ${nisn}? Aksi ini tidak dapat dibatalkan.`);
-        
-        if (isConfirmed) {
-            // Lakukan panggilan API ke Apps Script untuk menghapus
-            showModal('Menghapus Data', `Menghapus siswa NISN ${nisn}...`, 'loading', 0);
-            
-            const payload = new URLSearchParams({
-                action: 'deleteStudent',
-                nisn: nisn,
-            });
+    // NEW: Fungsi untuk menghapus siswa (menggunakan showConfirm)
+    function handleDeleteStudent(nisn, nama) {
+        showConfirm(
+            'Konfirmasi Penghapusan',
+            `Apakah Anda yakin ingin menghapus siswa ${nama} dengan NISN: ${nisn}? Aksi ini akan menghapus permanen data di Google Sheet dan tidak dapat dibatalkan.`,
+            async () => {
+                showModal('Menghapus Data', `Menghapus siswa NISN ${nisn}...`, 'loading', 0);
+                
+                const payload = new URLSearchParams({
+                    action: 'deleteStudent',
+                    nisn: nisn,
+                });
 
-            postData(payload).then(result => {
+                const result = await postData(payload);
                 hideModal();
                 if (result && result.status === 'success') {
                     showModal('Penghapusan Berhasil', result.message || `Siswa NISN ${nisn} berhasil dihapus.`, 'success', 3000);
@@ -2267,42 +2394,46 @@
                 } else {
                     showModal('Penghapusan Gagal', result ? result.message : 'Terjadi kesalahan saat menghapus data.', 'error', 5000);
                 }
-            });
-        }
+            }
+        );
     }
 
-    // NEW: Fungsi untuk menghapus siswa berdasarkan filter (Perbaikan 3)
+    // NEW: Fungsi untuk menghapus siswa berdasarkan filter (menggunakan showConfirm)
     async function handleDeleteFilteredStudents() {
         if (currentFilteredStudentCount === 0) {
             showModal('Peringatan', 'Tidak ada siswa yang cocok dengan filter saat ini untuk dihapus.', 'error', 3000);
             return;
         }
         
-        const confirmation = window.confirm(`PERINGATAN: Anda akan menghapus ${currentFilteredStudentCount} data siswa yang cocok dengan filter saat ini (Cari: "${currentFilterTerm || 'SEMUA'}", Kelas: "${currentFilterKelas || 'SEMUA'}", Jurusan: "${currentFilterJurusan || 'SEMUA'}"). Apakah Anda yakin? Aksi ini TIDAK dapat dibatalkan.`);
-
-        if (!confirmation) return;
-
-        showModal('Menghapus Data', `Menghapus ${currentFilteredStudentCount} siswa berdasarkan filter... Proses ini mungkin memakan waktu.`, 'loading', 0);
+        const filterSummary = `Cari: "${currentFilterTerm || 'SEMUA'}", Kelas: "${currentFilterKelas || 'SEMUA'}", Jurusan: "${currentFilterJurusan || 'SEMUA'}"`;
         
-        const payload = new URLSearchParams({
-            action: 'deleteStudentsByFilter', // New action for Apps Script
-            searchTerm: currentFilterTerm,
-            kelas: currentFilterKelas,
-            jurusan: currentFilterJurusan
-        });
+        showConfirm(
+            'KONFIRMASI HAPUS MASSAL',
+            `PERINGATAN: Anda akan menghapus **${currentFilteredStudentCount}** data siswa yang cocok dengan filter saat ini. (${filterSummary}). Aksi ini TIDAK dapat dibatalkan!`,
+            async () => {
+                showModal('Menghapus Data Massal', `Menghapus ${currentFilteredStudentCount} siswa berdasarkan filter... Proses ini mungkin memakan waktu.`, 'loading', 0);
+                
+                const payload = new URLSearchParams({
+                    action: 'deleteStudentsByFilter', // New action for Apps Script
+                    searchTerm: currentFilterTerm,
+                    kelas: currentFilterKelas,
+                    jurusan: currentFilterJurusan
+                });
 
-        const result = await postData(payload);
-        hideModal();
+                const result = await postData(payload);
+                hideModal();
 
-        if (result && result.status === 'success') {
-            showModal('Penghapusan Berhasil', result.message || `${currentFilteredStudentCount} data siswa telah dihapus.`, 'success', 3000);
-            
-            // Clear local cache and reload table to reflect changes
-            allStudentsData = [];
-            document.getElementById('admin-management-form').dispatchEvent(new Event('submit'));
-        } else {
-            showModal('Penghapusan Gagal', result ? result.message : 'Terjadi kesalahan saat menghapus data. Pastikan fungsi Apps Script sudah di-redeploy.', 'error', 5000);
-        }
+                if (result && result.status === 'success') {
+                    showModal('Penghapusan Berhasil', result.message || `${currentFilteredStudentCount} data siswa telah dihapus.`, 'success', 3000);
+                    
+                    // Clear local cache and reload table to reflect changes
+                    allStudentsData = [];
+                    document.getElementById('admin-management-form').dispatchEvent(new Event('submit'));
+                } else {
+                    showModal('Penghapusan Gagal', result ? result.message : 'Terjadi kesalahan saat menghapus data. Pastikan fungsi Apps Script sudah di-redeploy.', 'error', 5000);
+                }
+            }
+        );
     }
     
     // NEW: Fungsi untuk menambah siswa baru
@@ -2433,13 +2564,18 @@
         const form = document.getElementById('admin-config-form');
         const applyBase64Btn = document.getElementById('apply-base64-btn');
         const logoUrlInput = document.getElementById('config-logo-url');
+        const nameInput = document.getElementById('config-school-name');
+
+        // Set initial values (for state consistency)
+        nameInput.value = APP_CONFIG.SCHOOL_NAME;
+        logoUrlInput.value = APP_CONFIG.LOGO_URL;
 
         if (!form || !applyBase64Btn) return;
 
         form.addEventListener('submit', function(e) {
             e.preventDefault();
             
-            const newName = document.getElementById('config-school-name').value.trim();
+            const newName = nameInput.value.trim();
             const newLogoUrl = logoUrlInput.value.trim();
 
             if (!newName) { showModal('Peringatan', 'Nama sekolah tidak boleh kosong.', 'error', 3000); return; }
@@ -2461,12 +2597,12 @@
 
         applyBase64Btn.addEventListener('click', function() {
             const base64String = document.getElementById('config-logo-base64').value.trim();
-            const nameInput = document.getElementById('config-school-name').value.trim();
+            const nameInputVal = document.getElementById('config-school-name').value.trim();
 
-            if (!nameInput) { showModal('Peringatan', 'Nama sekolah harus diisi sebelum menyimpan Base64.', 'error', 3000); return; }
+            if (!nameInputVal) { showModal('Peringatan', 'Nama sekolah harus diisi sebelum menyimpan Base64.', 'error', 3000); return; }
 
             if (base64String.startsWith('data:image/')) {
-                APP_CONFIG.SCHOOL_NAME = nameInput;
+                APP_CONFIG.SCHOOL_NAME = nameInputVal;
                 APP_CONFIG.LOGO_URL = base64String;
                 logoUrlInput.value = base64String;
                 updateHeaderDisplay();
@@ -2542,25 +2678,24 @@
     
     setInterval(updateTime, 1000);
     
-    // Helper function for Export button
+    // Helper function for Export button (Perbaikan: Mengganti alert dengan showModal)
     function handleExport(type) {
         if (type === 'print') {
             window.print();
         } else if (type === 'xlsx') {
-            alert('Fitur Export XLSX memerlukan library sisi klien yang lebih kompleks. Silakan gunakan tombol "Edit Data di Google Sheet" dan lakukan export secara manual dari sana.');
+            showModal('Fitur Tidak Tersedia', 'Fitur Export XLSX memerlukan library sisi klien yang kompleks. Silakan gunakan tombol "Edit Data di Google Sheet" dan lakukan export secara manual dari sana.', 'info', 5000, 'file-export');
         }
     }
     
-    // Helper function to open Google Sheet
+    // Helper function to open Google Sheet (Perbaikan: Mengganti alert dengan showModal)
     function openGoogleSheetLink() {
         if (GOOGLE_SHEET_URL) {
             window.open(GOOGLE_SHEET_URL, '_blank');
         } else {
-            alert('URL Google Sheet belum dikonfigurasi.');
+            showModal('Konfigurasi Belum Selesai', 'URL Google Sheet belum dikonfigurasi.', 'error', 3000);
         }
     }
 
 </script>
 </body>
 </html>
-
