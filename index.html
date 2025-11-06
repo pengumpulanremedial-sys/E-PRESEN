@@ -36,20 +36,7 @@
 
         /* CSS untuk menyembunyikan elemen non-cetak saat window.print() dipanggil (PERBAIKAN 1) */
         @media print {
-            /* 1. KONTROL MARGIN & PENGHAPUSAN HEADER/FOOTER BROWSER */
-            @page {
-                margin: 1cm !important; /* Atur margin minimal */
-                /* Hapus header/footer URL browser */
-                size: A4 portrait;
-            }
-            body {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-            
-            /* 2. SEMBUNYIKAN ELEMEN INTERAKTIF */
+            /* Sembunyikan elemen navigasi dan kontrol */
             header, nav, .flex.justify-end, .page:not(#dashboard-container), 
             h2, .bg-purple-50, .bg-indigo-50, #modal-message, #mini-popup, #dashboard-tabs, 
             .print-hidden, #recap-results > div:nth-child(1), #admin-recap-results > div:nth-child(1), 
@@ -57,11 +44,19 @@
                 display: none !important;
             }
             
-            /* 3. TAMPILAN KONTEN UTAMA DAN TABEL */
-            main {
-                padding: 0 !important;
+            /* Tampilkan header tabel di setiap halaman */
+            thead {
+                display: table-header-group;
             }
-
+            
+            /* Atur ulang margin dan padding untuk cetak penuh */
+            body, main {
+                margin: 0 !important;
+                padding: 0 !important;
+                min-height: auto !important;
+            }
+            
+            /* Pastikan konten utama yang dicetak menempati seluruh lebar kertas */
             #tab-content {
                 box-shadow: none !important;
                 border: none !important;
@@ -71,70 +66,59 @@
                 padding: 0 !important;
             }
             
+            /* Tampilkan hasil rekap dan tabel */
             #recap-results, #admin-recap-results, #total-recap-results {
                 display: block !important;
-                /* Tambahkan padding sedikit agar tidak terlalu mepet tepi kertas */
-                padding: 0.5cm; 
             }
             
+            /* Reset overflow untuk mencetak semua baris tabel */
             .overflow-x-auto {
                 overflow: visible !important;
             }
             
-            /* 4. PENYESUAIAN GAYA TABEL UNTUK KETERBACAAN DAN LEBAR */
-            table {
-                font-size: 9.5pt; /* Sedikit lebih kecil untuk muat banyak data */
-                width: 100% !important;
-                table-layout: fixed !important; /* Gunakan fixed agar lebar terjamin */
-                border-collapse: collapse; 
-            }
-            
-            td, th {
-                white-space: normal;
-                padding: 4px 6px; /* Tambah padding agar ada jarak baris yang cukup */
-                line-height: 1.35; /* Jarak baris yang baik */
-                word-wrap: break-word; 
-                overflow-wrap: break-word;
-                vertical-align: middle; 
-                border: 1px solid #ddd; /* Tambahkan border untuk rapih */
-            }
-
-            thead {
-                display: table-header-group;
-                background-color: #e0e7ff !important; 
-            }
-            
-            /* 5. TAMPILAN HEADER CETAK KHUSUS */
+            /* Tampilkan header cetak */
             .print-only {
                 display: block !important;
-                margin-bottom: 5px !important; 
-                padding: 0;
+                margin-bottom: 20px !important;
+                padding: 0 !important;
                 border: none !important;
-                color: #000; 
-                width: 100%;
+                color: #000; /* Pastikan teks berwarna hitam */
             }
 
-            /* --- SKEMA LEBAR KOLOM AKHIR (Total harus 100%) --- */
+            /* --- SKEMA LEBAR KOLOM BARU YANG LEBIH DINAMIS --- */
+            /* Skema untuk Detail Harian */
+            #recap-results table th:nth-child(1), 
+            #admin-recap-results table th:nth-child(1) { width: 4%; } /* NO */
             
-            /* Skema untuk Detail Harian (Total 100%) */
-            #recap-results table th:nth-child(1), #admin-recap-results table th:nth-child(1) { width: 4%; } /* NO */
-            #recap-results table th:nth-child(2), #admin-recap-results table th:nth-child(2) { width: 12%; } /* NISN */
-            #recap-results table th:nth-child(3), #admin-recap-results table th:nth-child(3) { width: 28%; } /* NAMA SISWA */
-            #recap-results table th:nth-child(4), #admin-recap-results table th:nth-child(4) { width: 13%; } /* KELAS/JURUSAN */
-            #recap-results table th:nth-child(5), #admin-recap-results table th:nth-child(5) { width: 15%; } /* TGL/WAKTU */
-            #recap-results table th:nth-child(6), #admin-recap-results table th:nth-child(6) { width: 8%; } /* STATUS */
-            #recap-results table th:nth-child(7), #admin-recap-results table th:nth-child(7) { width: 20%; } /* KETERANGAN */
+            #recap-results table th:nth-child(2), 
+            #admin-recap-results table th:nth-child(2) { width: 14%; } /* NISN */
+            
+            #recap-results table th:nth-child(3), 
+            #admin-recap-results table th:nth-child(3) { width: 28%; } /* NAMA SISWA (Paling Lebar) */
+            
+            #recap-results table th:nth-child(4), 
+            #admin-recap-results table th:nth-child(4) { width: 16%; } /* KELAS/JURUSAN */
+            
+            #recap-results table th:nth-child(5), 
+            #admin-recap-results table th:nth-child(5) { width: 16%; } /* TGL/WAKTU */
+            
+            #recap-results table th:nth-child(6), 
+            #admin-recap-results table th:nth-child(6) { width: 8%; } /* STATUS */
+            
+            #recap-results table th:nth-child(7), 
+            #admin-recap-results table th:nth-child(7) { width: 14%; } /* KETERANGAN */
 
-            /* Skema untuk Rekap Total (Total 100%) */
+            /* Skema untuk Rekap Total */
             #total-recap-results table th:nth-child(1) { width: 4%; } /* No */
             #total-recap-results table th:nth-child(2) { width: 12%; } /* NISN */
-            #total-recap-results table th:nth-child(3) { width: 30%; } /* Nama Siswa */
-            #total-recap-results table th:nth-child(4) { width: 14%; } /* Kelas/Jurusan */
-            #total-recap-results table th:nth-child(5) { width: 10%; } /* Hadir */
-            #total-recap-results table th:nth-child(6) { width: 10%; } /* Izin */
-            #total-recap-results table th:nth-child(7) { width: 10%; } /* Sakit */
-            #total-recap-results table th:nth-child(8) { width: 10%; } /* Alpha */
+            #total-recap-results table th:nth-child(3) { width: 25%; } /* Nama Siswa */
+            #total-recap-results table th:nth-child(4) { width: 13%; } /* Kelas/Jurusan */
+            #total-recap-results table th:nth-child(5) { width: 11%; } /* Hadir */
+            #total-recap-results table th:nth-child(6) { width: 11%; } /* Izin */
+            #total-recap-results table th:nth-child(7) { width: 11%; } /* Sakit */
+            #total-recap-results table th:nth-child(8) { width: 11%; } /* Alpha */
             
+            /* --- END PERBAIKAN BUG OVERLAP CETAK --- */
         }
     </style>
 </head>
@@ -152,7 +136,7 @@
                     alt="Logo Sekolah">
 
                 <h1 id="school-title-display" class="text-xl md:text-2xl font-extrabold tracking-tight cursor-default transition-colors duration-300 hover:text-indigo-200">
-                    Absensi SMK Sehati Karawang
+                    E-Absensi SMK Sehati Karawang
                 </h1>
             </div>
             
@@ -172,7 +156,7 @@
             
             <h2 class="text-4xl md:text-5xl font-extrabold text-indigo-700 text-center mb-4">Sistem Kehadiran Digital</h2>
             <p class="text-center text-gray-500 mb-8 md:text-lg">
-                Selamat datang di SMK Sehati Karawang. Silakan pilih peran Anda untuk masuk ke dashboard.
+                Selamat datang di aplikasi e-absensi . Silakan pilih peran Anda untuk masuk ke dashboard.
                 
             </p>
             
@@ -205,7 +189,7 @@
             
             <div id="login-message" class="mt-4 text-center text-red-500 font-semibold hidden"></div>
             <p class="text-xs text-gray-400 text-center mt-6">
-                *Demo Login: Data diambil dari Google Sheet Anda melalui Apps Script. Pastikan akun tersedia di Sheet "Data Siswa".
+                *Perhatikan saat mengisi NISN/NIP telah sesaui, Jika ada kendala hub admin
             </p>
         </div>
 
@@ -324,7 +308,7 @@
     // ====================================================================
     
     let APP_CONFIG = {
-        SCHOOL_NAME: "Absensi SMK Sehati Karawang",
+        SCHOOL_NAME: "E-Absensi SMK Sehati Karawang",
         LOGO_URL: "https://placehold.co/40x40/ffffff/indigo?text=S"
     };
 
@@ -1602,7 +1586,7 @@
         const allMajors = currentUser.jurusanAjar || [];
 
         return `
-            <h3 class="text-2xl font-bold text-gray-700 mb-6 flex items-center"><span data-lucide="bar-chart-2" class="w-6 h-6 mr-2"></span> Rekapitulasi Total Absensi Siswa (Summary)</h3>
+            <h3 class="text-2xl font-bold text-gray-700 mb-6 flex items-center"><span data-lucide="bar-chart-2" class="w-6 h-6 mr-2"></span> Rekapitulasi Total Absensi Siswa </h3>
             <p class="text-gray-500 mb-6">Lihat ringkasan total Hadir/Izin/Sakit/Alpha per siswa dalam periode waktu yang dipilih.</p>
             
             <div id="total-recap-form" class="bg-purple-50 p-5 rounded-lg shadow-inner mb-6 print-hidden">
@@ -2699,6 +2683,7 @@
             // Refresh list setelah simpan
             const loadForm = document.getElementById('assessment-load-form');
             if (loadForm) {
+                 // FIX: Tambahkan delay 50ms untuk sinkronisasi data Apps Script
                  setTimeout(() => loadForm.dispatchEvent(new Event('submit')), 50);
             } else {
                  selectTab('penilaian');
@@ -3094,3 +3079,5 @@
 </script>
 </body>
 </html>
+
+
