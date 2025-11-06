@@ -29,14 +29,18 @@
         .chart-container {
             width: 100%;
         }
+        /* Hide print-only elements in screen view */
+        .print-only { 
+            display: none !important; 
+        }
+
         /* CSS untuk menyembunyikan elemen non-cetak saat window.print() dipanggil (PERBAIKAN 1) */
         @media print {
             /* Sembunyikan elemen navigasi dan kontrol */
             header, nav, .flex.justify-end, .page:not(#dashboard-container), 
             h2, .bg-purple-50, .bg-indigo-50, #modal-message, #mini-popup, #dashboard-tabs, 
-            #teacher-recap-form, #admin-recap-form, .print-hidden, 
-            #recap-results > div:nth-child(1), #admin-recap-results > div:nth-child(1), 
-            #total-recap-form, #total-recap-message, #total-recap-results .print-hidden {
+            .print-hidden, #recap-results > div:nth-child(1), #admin-recap-results > div:nth-child(1), 
+            #teacher-recap-form, #admin-recap-form, #total-recap-form, #total-recap-message {
                 display: none !important;
             }
             
@@ -72,24 +76,15 @@
                 overflow: visible !important;
             }
             
-            /* --- PERBAIKAN BUG OVERLAP CETAK --- */
-            table {
-                font-size: 10pt;
-                width: 100% !important;
-                /* Hapus table-layout: fixed, biarkan browser menentukan layoutnya */
-                table-layout: auto !important; 
-                border-collapse: collapse; /* Pastikan garis tidak terpisah */
+            /* Tampilkan header cetak */
+            .print-only {
+                display: block !important;
+                margin-bottom: 20px !important;
+                padding: 0 !important;
+                border: none !important;
+                color: #000; /* Pastikan teks berwarna hitam */
             }
-            
-            td, th {
-                white-space: normal;
-                padding: 4px 6px; /* Tambah padding agar ada jarak */
-                /* Pastikan pemecahan kata (word breaking) terjadi */
-                word-wrap: break-word; 
-                overflow-wrap: break-word;
-                vertical-align: top; /* Rata atas untuk teks multi-baris */
-            }
-            
+
             /* --- SKEMA LEBAR KOLOM BARU YANG LEBIH DINAMIS --- */
             /* Skema untuk Detail Harian */
             #recap-results table th:nth-child(1), 
@@ -194,7 +189,7 @@
             
             <div id="login-message" class="mt-4 text-center text-red-500 font-semibold hidden"></div>
             <p class="text-xs text-gray-400 text-center mt-6">
-                *Perahtikan saat mengisi NISN/NIP telah sesaui, Jika ada kendala hub admin".
+                *Demo Login: Data diambil dari Google Sheet Anda melalui Apps Script. Pastikan akun tersedia di Sheet "Data Siswa".
             </p>
         </div>
 
@@ -329,6 +324,7 @@
     let allStudentsData = []; // Data mentah semua siswa untuk Admin Management
     let currentRecapData = [];
     let currentTotalRecapData = []; // NEW: Untuk menyimpan data rekap total
+    let currentRecapFilters = {}; // NEW: Store current filters for printing/export
 
     // NEW: Global state untuk filter manajemen siswa
     let currentFilterTerm = '';
@@ -781,6 +777,8 @@
             currentTotalRecapData = []; // Clear total recap state on tab change
         }
 
+        currentRecapFilters = {}; // Clear print filters on tab change
+
 
         switch (tabId) {
             case 'absensi':
@@ -1156,6 +1154,14 @@
         const url = `${WEB_APP_URL}?action=${action}&kelas=${kelas}&jurusan=${jurusan}&periode=${periode}&role=${currentUser.role}&nip=${currentUser.nip || ''}`;
         const result = await fetchData(url);
         
+        // Simpan Filter untuk Keperluan Cetak/Export
+        currentRecapFilters = {
+            kelas: kelas,
+            jurusan: jurusan,
+            periode: periode,
+            isTotalRecap: false
+        };
+        
         if (result && result.status === 'success') {
             const filteredRecords = result.records;
             currentRecapData = filteredRecords;
@@ -1207,13 +1213,30 @@
             tableBody.innerHTML = html;
             messageDiv.classList.add('hidden');
             resultsDiv.classList.remove('hidden');
+            
+            // Inject Print Header
+            const periodLabel = periode.charAt(0).toUpperCase() + periode.slice(1);
+            const printHeader = `
+                <div id="${resultsId}-print-header" class="mb-4 p-3 print-only">
+                    <h4 class="text-xl font-bold text-gray-800">Rekapitulasi Detail Absensi Siswa</h4>
+                    <p class="text-sm text-gray-600">
+                        Kelas: <span class="font-semibold">${kelas || 'Semua'}</span> | 
+                        Jurusan: <span class="font-semibold">${jurusan || 'Semua'}</span> | 
+                        Periode: <span class="font-semibold">${periodLabel}</span>
+                    </p>
+                    <p class="text-xs text-gray-500 mt-2">Dicetak pada: ${new Date().toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'})}</p>
+                </div>
+            `;
+            // Clear old header and insert new one
+            document.getElementById(resultsId).querySelectorAll('.print-only').forEach(el => el.remove());
+            resultsDiv.insertAdjacentHTML('afterbegin', printHeader);
 
         } else {
             messageDiv.innerHTML = `<p class="font-semibold text-red-500">${result ? result.message : 'Gagal memuat data rekap.'}</p>`;
         }
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
-    
+
     // NEW FUNCTION: Display Total Recap
     async function displayTotalRecap(kelas, jurusan, periode, startDate, endDate) {
         const resultsDiv = document.getElementById('total-recap-results');
@@ -1231,6 +1254,16 @@
         let url = `${WEB_APP_URL}?action=${action}&kelas=${kelas}&jurusan=${jurusan}&periode=${periode}&startDate=${startDate || ''}&endDate=${endDate || ''}&role=${currentUser.role}&nip=${currentUser.nip || ''}`;
 
         const result = await fetchData(url);
+        
+        // Simpan Filter untuk Keperluan Cetak/Export
+        currentRecapFilters = {
+            kelas: kelas,
+            jurusan: jurusan,
+            periode: periode,
+            startDate: startDate,
+            endDate: endDate,
+            isTotalRecap: true
+        };
         
         if (result && result.status === 'success' && result.summary) {
             currentTotalRecapData = result.summary;
@@ -1265,6 +1298,38 @@
             tableBody.innerHTML = html;
             messageDiv.classList.add('hidden');
             resultsDiv.classList.remove('hidden');
+
+            // Inject Print Header
+            let periodText = '';
+            const periodeElement = document.getElementById('total-rekap-periode');
+            if (periode === 'custom' && startDate && endDate) {
+                // Formatting dates for display: YYYY-MM-DD to DD/MM/YYYY (approx)
+                const formattedStart = new Date(startDate).toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'});
+                const formattedEnd = new Date(endDate).toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'});
+                periodText = `Periode Khusus: ${formattedStart} s/d ${formattedEnd}`;
+            } else if (periode && periodeElement) {
+                const selectedOption = periodeElement.querySelector(`option[value="${periode}"]`);
+                const periodLabel = selectedOption ? selectedOption.textContent : periode.toUpperCase();
+                periodText = `Periode Cepat: ${periodLabel}`;
+            } else {
+                 periodText = 'Periode: Keseluruhan';
+            }
+
+            const printHeader = `
+                <div id="total-recap-results-print-header" class="mb-4 p-3 print-only">
+                    <h4 class="text-xl font-bold text-gray-800">Rekapitulasi Total Absensi Siswa</h4>
+                    <p class="text-sm text-gray-600">
+                        Kelas: <span class="font-semibold">${kelas || 'Semua'}</span> | 
+                        Jurusan: <span class="font-semibold">${jurusan || 'Semua'}</span> | 
+                        <span class="font-semibold">${periodText}</span>
+                    </p>
+                    <p class="text-xs text-gray-500 mt-2">Dicetak pada: ${new Date().toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'})}</p>
+                </div>
+            `;
+            
+            // Clear old header and insert new one
+            document.getElementById('total-recap-results').querySelectorAll('.print-only').forEach(el => el.remove());
+            resultsDiv.insertAdjacentHTML('afterbegin', printHeader);
 
         } else {
             const errorMsg = result ? result.message : 'Gagal memuat data rekap total. Pastikan fungsi Apps Script sudah di-redeploy.';
@@ -1521,7 +1586,7 @@
         const allMajors = currentUser.jurusanAjar || [];
 
         return `
-            <h3 class="text-2xl font-bold text-gray-700 mb-6 flex items-center"><span data-lucide="bar-chart-2" class="w-6 h-6 mr-2"></span> Rekapitulasi Total Absensi Siswa </h3>
+            <h3 class="text-2xl font-bold text-gray-700 mb-6 flex items-center"><span data-lucide="bar-chart-2" class="w-6 h-6 mr-2"></span> Rekapitulasi Total Absensi Siswa (Summary)</h3>
             <p class="text-gray-500 mb-6">Lihat ringkasan total Hadir/Izin/Sakit/Alpha per siswa dalam periode waktu yang dipilih.</p>
             
             <div id="total-recap-form" class="bg-purple-50 p-5 rounded-lg shadow-inner mb-6 print-hidden">
@@ -3014,6 +3079,3 @@
 </script>
 </body>
 </html>
-
-
-
