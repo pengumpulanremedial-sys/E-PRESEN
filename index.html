@@ -35,7 +35,8 @@
             header, nav, .flex.justify-end, .page:not(#dashboard-container), 
             h2, .bg-purple-50, .bg-indigo-50, #modal-message, #mini-popup, #dashboard-tabs, 
             #teacher-recap-form, #admin-recap-form, .print-hidden, 
-            #recap-results > div:nth-child(1), #admin-recap-results > div:nth-child(1) {
+            #recap-results > div:nth-child(1), #admin-recap-results > div:nth-child(1), 
+            #total-recap-form, #total-recap-message, #total-recap-results .print-hidden {
                 display: none !important;
             }
             
@@ -62,7 +63,7 @@
             }
             
             /* Tampilkan hasil rekap dan tabel */
-            #recap-results, #admin-recap-results {
+            #recap-results, #admin-recap-results, #total-recap-results {
                 display: block !important;
             }
             
@@ -90,8 +91,7 @@
             }
             
             /* --- SKEMA LEBAR KOLOM BARU YANG LEBIH DINAMIS --- */
-            /* Menggunakan width yang lebih kecil dari 100% agar ada ruang yang bisa diregangkan oleh browser */
-            
+            /* Skema untuk Detail Harian */
             #recap-results table th:nth-child(1), 
             #admin-recap-results table th:nth-child(1) { width: 4%; } /* NO */
             
@@ -113,6 +113,16 @@
             #recap-results table th:nth-child(7), 
             #admin-recap-results table th:nth-child(7) { width: 14%; } /* KETERANGAN */
 
+            /* Skema untuk Rekap Total */
+            #total-recap-results table th:nth-child(1) { width: 4%; } /* No */
+            #total-recap-results table th:nth-child(2) { width: 12%; } /* NISN */
+            #total-recap-results table th:nth-child(3) { width: 25%; } /* Nama Siswa */
+            #total-recap-results table th:nth-child(4) { width: 13%; } /* Kelas/Jurusan */
+            #total-recap-results table th:nth-child(5) { width: 11%; } /* Hadir */
+            #total-recap-results table th:nth-child(6) { width: 11%; } /* Izin */
+            #total-recap-results table th:nth-child(7) { width: 11%; } /* Sakit */
+            #total-recap-results table th:nth-child(8) { width: 11%; } /* Alpha */
+            
             /* --- END PERBAIKAN BUG OVERLAP CETAK --- */
         }
     </style>
@@ -274,9 +284,9 @@
                 <div>
                     <label for="new-email" class="block text-sm font-medium text-gray-700">Email <span class="text-red-500">*</span></label>
                     <input type="text" id="new-email" name="email" required 
-                           placeholder="email@sekolah.sch.id (Mengizinkan strip/hyphen)" 
-                           pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-                           class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                               placeholder="email@sekolah.sch.id (Mengizinkan strip/hyphen)" 
+                               pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+                               class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
                     <p class="text-xs text-gray-500 mt-1">Pastikan email valid. Karakter strip (-) diizinkan di nama pengguna.</p>
                 </div>
                 <div>
@@ -318,6 +328,7 @@
     let historyRecords = [];
     let allStudentsData = []; // Data mentah semua siswa untuk Admin Management
     let currentRecapData = [];
+    let currentTotalRecapData = []; // NEW: Untuk menyimpan data rekap total
 
     // NEW: Global state untuk filter manajemen siswa
     let currentFilterTerm = '';
@@ -345,14 +356,16 @@
             { id: 'profil', label: 'Profil Saya', icon: 'user' },
         ],
         teacher: [
-            { id: 'rekap-guru', label: 'Rekap Absensi', icon: 'file-text' },
+            { id: 'rekap-guru', label: 'Rekap Detail Harian', icon: 'file-text' }, // Existing Detail Recap
+            { id: 'rekap-total', label: 'Rekap Total Absen', icon: 'bar-chart-2' }, // NEW Total Recap
             { id: 'perbandingan', label: 'Perbandingan Kelas', icon: 'bar-chart-3' },
             { id: 'absensi-siswa', label: 'Absensi Manual Siswa', icon: 'calendar-check' }, 
             { id: 'penilaian', label: 'Input Penilaian', icon: 'file-plus' },
             { id: 'profil', label: 'Profil Saya', icon: 'user' },
         ],
         admin: [
-            { id: 'rekap-admin', label: 'Rekap Global', icon: 'database' },
+            { id: 'rekap-admin', label: 'Rekap Detail Global', icon: 'database' },
+            { id: 'rekap-total', label: 'Rekap Total Absen', icon: 'bar-chart-2' }, // NEW Total Recap
             { id: 'konfigurasi', label: 'Konfigurasi Aplikasi', icon: 'settings' }, 
             { id: 'manajemen', label: 'Manajemen Data Siswa', icon: 'users' }, 
         ]
@@ -763,6 +776,10 @@
         if (tabId !== 'rekap-guru' && tabId !== 'rekap-admin') {
             currentRecapData = [];
         }
+        
+        if (tabId !== 'rekap-total') {
+            currentTotalRecapData = []; // Clear total recap state on tab change
+        }
 
 
         switch (tabId) {
@@ -777,6 +794,11 @@
             case 'rekap-guru':
                 contentDiv.innerHTML = renderTeacherRecap();
                 setupTeacherRecapListeners();
+                break;
+            // NEW CASE: Rekap Total Absen
+            case 'rekap-total':
+                contentDiv.innerHTML = renderTeacherTotalRecap();
+                setupTeacherTotalRecapListeners();
                 break;
             case 'perbandingan':
                 contentDiv.innerHTML = renderTeacherComparison();
@@ -905,7 +927,7 @@
         if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; }
         if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
 
-        allStudentsData = []; currentRecapData = [];
+        allStudentsData = []; currentRecapData = []; currentTotalRecapData = [];
         currentUser = null; currentRole = null; currentTab = '';
         saveAppState(); // Removes state
 
@@ -1119,70 +1141,7 @@
     }
 
 
-    async function displayComparisonCharts(filterType) {
-        const messageDiv = document.getElementById('comparison-message');
-        const chartContainer = document.getElementById('comparison-chart-container');
-        const chartTitleEl = document.getElementById('comparison-chart-title');
-        const attendanceChartContainer = document.getElementById('comparison-attendance-chart-container');
-        const attendanceChartTitleEl = document.getElementById('comparison-attendance-chart-title');
-
-        messageDiv.classList.remove('hidden'); chartContainer.classList.add('hidden'); attendanceChartContainer.classList.add('hidden');
-        
-        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-purple-500"></span></div><span class="ml-3 text-purple-600">Mengambil data perbandingan...</span>`;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-
-        const url = `${WEB_APP_URL}?action=getComparisonData&role=${currentUser.role}&nip=${currentUser.nip || ''}`;
-        const result = await fetchData(url);
-
-        if (result && result.status === 'success' && result.comparisonData) {
-            const { classDemographic, majorDemographic, classAttendance, majorAttendance } = result.comparisonData;
-            
-            let demographicData = []; let attendanceData = {}; let demographicTitle = ''; let attendanceTitle = '';
-
-            if (filterType === 'class') {
-                demographicData = classDemographic;
-                attendanceData = classAttendance;
-                demographicTitle = 'Perbandingan Jumlah Siswa Antar Kelas';
-                attendanceTitle = 'Perbandingan Persentase Kehadiran Antar Kelas';
-            } else if (filterType === 'major') {
-                demographicData = majorDemographic;
-                attendanceData = majorAttendance;
-                demographicTitle = 'Perbandingan Jumlah Siswa Antar Jurusan';
-                attendanceTitle = 'Perbandingan Persentase Kehadiran Antar Jurusan';
-            }
-
-            if (demographicData.length > 0) {
-                // Render Chart 1: Demografi (Jumlah Siswa Total)
-                renderDemographicChart('comparison-chart', demographicData, demographicTitle);
-                chartTitleEl.textContent = demographicTitle;
-                chartContainer.classList.remove('hidden');
-                messageDiv.classList.add('hidden');
-            }
-
-            if (Object.keys(attendanceData).length > 0) {
-                 // Render Chart 2: Kehadiran (Persentase Status)
-                renderAttendanceComparisonChart('comparison-attendance-chart', attendanceData, attendanceTitle);
-                attendanceChartTitleEl.textContent = attendanceTitle;
-                attendanceChartContainer.classList.remove('hidden');
-                messageDiv.classList.add('hidden');
-            }
-            
-            if (demographicData.length === 0 && Object.keys(attendanceData).length === 0) {
-                messageDiv.classList.remove('hidden');
-                messageDiv.innerHTML = `<p class="font-semibold text-gray-700">Tidak ada data yang ditemukan untuk perbandingan ini dalam wewenang Anda.</p>`;
-            }
-
-        } else {
-            messageDiv.classList.remove('hidden');
-            const errorMessage = result ? result.message : 'Gagal memuat data perbandingan. Cek log konsol untuk detail error Apps Script.';
-            console.error(`Error memuat perbandingan: ${errorMessage}`);
-            messageDiv.innerHTML = `<p class="font-semibold text-red-500">Gagal memuat data perbandingan. Cek log konsol untuk detail error Apps Script.</p>`;
-        }
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
-
-
-    async function displayRecap(kelas, jurusan, periode, resultsId, messageId, tableBodyId, canvasId) {
+    async function displayRecap(kelas, jurusan, periode, resultsId, messageId, tableBodyId, canvasId, action) {
         const resultsDiv = document.getElementById(resultsId);
         const messageDiv = document.getElementById(messageId);
         const tableBody = document.getElementById(tableBodyId);
@@ -1194,7 +1153,7 @@
         
         document.getElementById(`${canvasId}-summary`).innerHTML = '';
 
-        const url = `${WEB_APP_URL}?action=getRecap&kelas=${kelas}&jurusan=${jurusan}&periode=${periode}&role=${currentUser.role}&nip=${currentUser.nip || ''}`;
+        const url = `${WEB_APP_URL}?action=${action}&kelas=${kelas}&jurusan=${jurusan}&periode=${periode}&role=${currentUser.role}&nip=${currentUser.nip || ''}`;
         const result = await fetchData(url);
         
         if (result && result.status === 'success') {
@@ -1255,6 +1214,66 @@
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
     
+    // NEW FUNCTION: Display Total Recap
+    async function displayTotalRecap(kelas, jurusan, periode, startDate, endDate) {
+        const resultsDiv = document.getElementById('total-recap-results');
+        const messageDiv = document.getElementById('total-recap-message');
+        const tableBody = document.getElementById('total-recap-table-body');
+
+        resultsDiv.classList.add('hidden'); messageDiv.classList.remove('hidden');
+        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-purple-500"></span></div><span class="ml-3 text-purple-600">Menghitung rekap total...</span></div>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        tableBody.innerHTML = '';
+        currentTotalRecapData = [];
+
+        // Determine Action and URL Params
+        let action = 'getTotalRecap'; // Assuming Apps Script has this function
+        let url = `${WEB_APP_URL}?action=${action}&kelas=${kelas}&jurusan=${jurusan}&periode=${periode}&startDate=${startDate || ''}&endDate=${endDate || ''}&role=${currentUser.role}&nip=${currentUser.nip || ''}`;
+
+        const result = await fetchData(url);
+        
+        if (result && result.status === 'success' && result.summary) {
+            currentTotalRecapData = result.summary;
+
+            if (currentTotalRecapData.length === 0) {
+                messageDiv.innerHTML = `<p class="font-semibold text-gray-700">Tidak ada data absensi yang ditemukan dalam periode yang dipilih.</p>`;
+                return;
+            }
+
+            let html = '';
+            currentTotalRecapData.forEach((r, index) => {
+                const displayNama = r.nama || 'Nama Tidak Ditemukan'; 
+                const hadirCount = r.Hadir || 0;
+                const izinCount = r.Izin || 0;
+                const sakitCount = r.Sakit || 0;
+                const alphaCount = r.Alpha || 0;
+
+                html += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${index + 1}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${r.nisn || '-'}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900 font-semibold">${displayNama}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${r.kelas || '-'} / ${r.jurusan || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-600">${hadirCount}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-amber-600">${izinCount}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-600">${sakitCount}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-600">${alphaCount}</td>
+                    </tr>
+                `;
+            });
+
+            tableBody.innerHTML = html;
+            messageDiv.classList.add('hidden');
+            resultsDiv.classList.remove('hidden');
+
+        } else {
+            const errorMsg = result ? result.message : 'Gagal memuat data rekap total. Pastikan fungsi Apps Script sudah di-redeploy.';
+            messageDiv.innerHTML = `<p class="font-semibold text-red-500">${errorMsg}</p>`;
+        }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+
     // ====================================================================
     // --- 6. RENDERING FUNCTIONS (Membangun Struktur HTML) ---
     // ====================================================================
@@ -1458,7 +1477,7 @@
 
     function renderTeacherRecap() {
         return `
-            <h3 class="text-2xl font-bold text-gray-700 mb-6">Rekapitulasi Absensi Siswa</h3>
+            <h3 class="text-2xl font-bold text-gray-700 mb-6">Rekapitulasi Absensi Siswa (Detail Harian)</h3>
             <div class="bg-indigo-50 p-5 rounded-lg shadow-inner mb-6 print-hidden">
                 <form id="teacher-recap-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div>
@@ -1493,6 +1512,93 @@
                 ${generateRecapResultsTemplate('recap-chart')}
             </div>
             <div id="recap-message" class="text-center text-gray-500 py-10">Silahkan pilih filter untuk melihat rekap data.</div>
+        `;
+    }
+
+    // NEW FUNCTION: Render Halaman Rekap Total
+    function renderTeacherTotalRecap() {
+        const allClasses = currentUser.kelasAjar || [];
+        const allMajors = currentUser.jurusanAjar || [];
+
+        return `
+            <h3 class="text-2xl font-bold text-gray-700 mb-6 flex items-center"><span data-lucide="bar-chart-2" class="w-6 h-6 mr-2"></span> Rekapitulasi Total Absensi Siswa (Summary)</h3>
+            <p class="text-gray-500 mb-6">Lihat ringkasan total Hadir/Izin/Sakit/Alpha per siswa dalam periode waktu yang dipilih.</p>
+            
+            <div id="total-recap-form" class="bg-purple-50 p-5 rounded-lg shadow-inner mb-6 print-hidden">
+                <form id="rekap-total-form" class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+                    <!-- Kelas & Jurusan -->
+                    <div>
+                        <label for="total-rekap-kelas" class="block text-sm font-medium text-gray-700">Kelas</label>
+                        <select id="total-rekap-kelas" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500">
+                            <option value="">-- Semua Kelas --</option>
+                            ${allClasses.map(c => `<option value="${c}">${c}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="total-rekap-jurusan" class="block text-sm font-medium text-gray-700">Jurusan</label>
+                        <select id="total-rekap-jurusan" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500">
+                            <option value="">-- Semua Jurusan --</option>
+                            ${allMajors.map(j => `<option value="${j}">${j}</option>`).join('')}
+                        </select>
+                    </div>
+                    <!-- Pilihan Periode Cepat -->
+                    <div class="md:col-span-2">
+                        <label for="total-rekap-periode" class="block text-sm font-medium text-gray-700">Periode Cepat</label>
+                        <select id="total-rekap-periode" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500">
+                            <option value="">-- Pilih Durasi --</option>
+                            <option value="1bulan">1 Bulan Terakhir</option>
+                            <option value="3bulan">3 Bulan Terakhir (Kuartal)</option>
+                            <option value="6bulan">6 Bulan Terakhir (Semester)</option>
+                            <option value="12bulan">12 Bulan Terakhir (Tahunan)</option>
+                            <option value="custom">Rentang Waktu Khusus</option>
+                        </select>
+                    </div>
+                    <!-- Rentang Tanggal Khusus -->
+                    <div id="custom-date-group-start" class="hidden">
+                        <label for="total-rekap-start-date" class="block text-sm font-medium text-gray-700">Dari Tanggal</label>
+                        <input type="date" id="total-rekap-start-date" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+                    <div id="custom-date-group-end" class="hidden">
+                        <label for="total-rekap-end-date" class="block text-sm font-medium text-gray-700">Sampai Tanggal</label>
+                        <input type="date" id="total-rekap-end-date" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+                    <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 md:col-span-6 lg:col-span-2">
+                        <span data-lucide="calculator" class="w-4 h-4 mr-2"></span> Hitung Rekap Total
+                    </button>
+                </form>
+            </div>
+
+            <div id="total-recap-results" class="hidden">
+                <div class="flex justify-end space-x-3 mb-4 print-hidden">
+                    <button onclick="window.print()" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg flex items-center">
+                        <span data-lucide="printer" class="w-4 h-4 mr-2"></span> Cetak
+                    </button>
+                    <button onclick="openGoogleSheetLink()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center">
+                        <span data-lucide="database" class="w-4 h-4 mr-2"></span> Database
+                    </button>
+                </div>
+                
+                <div class="overflow-x-auto rounded-lg shadow-lg">
+                    <table class="min-w-full divide-y divide-gray-200 table-auto">
+                        <thead class="bg-purple-100">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">No</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">NISN</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Nama Siswa</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Kelas/Jurusan</th>
+                                <th class="px-6 py-3 text-center text-xs font-bold text-emerald-700 uppercase tracking-wider">Hadir</th>
+                                <th class="px-6 py-3 text-center text-xs font-bold text-amber-700 uppercase tracking-wider">Izin</th>
+                                <th class="px-6 py-3 text-center text-xs font-bold text-red-700 uppercase tracking-wider">Sakit</th>
+                                <th class="px-6 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Alpha</th>
+                            </tr>
+                        </thead>
+                        <tbody id="total-recap-table-body" class="bg-white divide-y divide-gray-200">
+                            <!-- Data summary per siswa di sini -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="total-recap-message" class="text-center text-gray-500 py-10">Pilih Kelas, Jurusan, dan Periode untuk menghitung total absensi.</div>
         `;
     }
 
@@ -1532,7 +1638,7 @@
                 </div>
                 
                 <!-- NEW Chart 2: Persentase Kehadiran (Perbaikan 1) -->
-                   <div id="comparison-attendance-chart-container" class="hidden p-6 bg-white rounded-xl shadow-lg border border-gray-100">
+                       <div id="comparison-attendance-chart-container" class="hidden p-6 bg-white rounded-xl shadow-lg border border-gray-100">
                         <h4 id="comparison-attendance-chart-title" class="text-xl font-bold text-emerald-600 mb-4 flex items-center"><span data-lucide="pie-chart" class="w-5 h-5 mr-2"></span> Grafik Persentase Kehadiran</h4>
                         <div class="chart-container relative h-96 md:h-[500px]">
                             <canvas id="comparison-attendance-chart"></canvas>
@@ -1707,10 +1813,10 @@
 
     function renderAdminGlobalRecap() {
         const allClasses = currentUser.kelasAjar || [];
-        const allMajors = currentUser.jurusanAjar || [];
+        const allMajors = currentUser.kelasAjar || [];
 
         return `
-            <h3 class="text-2xl font-bold text-gray-700 mb-6">Rekapitulasi Global Absensi Siswa</h3>
+            <h3 class="text-2xl font-bold text-gray-700 mb-6">Rekapitulasi Global Absensi Siswa (Detail Harian)</h3>
             <div class="bg-indigo-50 p-5 rounded-lg shadow-inner mb-6 print-hidden">
                 <form id="admin-recap-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div>
@@ -1785,21 +1891,21 @@
             <p id="admin-management-message" class="text-center text-gray-500 py-10">Memuat data siswa...</p>
             
             <form id="admin-student-update-form" class="hidden">
-                   <div class="flex flex-col space-y-3 md:flex-row justify-between items-center mb-4 md:space-y-0 print-hidden">
-                    <button type="button" onclick="openAddStudentModal()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center">
-                        <span data-lucide="user-plus" class="w-4 h-4 mr-2"></span> Tambah Siswa Baru
-                    </button>
-                    
-                    <div class="flex space-x-3 w-full md:w-auto">
-                        <button onclick="openGoogleSheetLink()" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center">
-                            <span data-lucide="external-link" class="w-4 h-4 mr-2"></span> Edit Data di Sheet
+                       <div class="flex flex-col space-y-3 md:flex-row justify-between items-center mb-4 md:space-y-0 print-hidden">
+                        <button type="button" onclick="openAddStudentModal()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center">
+                            <span data-lucide="user-plus" class="w-4 h-4 mr-2"></span> Tambah Siswa Baru
                         </button>
-                        <!-- NEW BULK DELETE BUTTON (Perbaikan 3) -->
-                        <button onclick="handleDeleteFilteredStudents()" type="button" id="bulk-delete-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center disabled:opacity-50" disabled>
-                            <span data-lucide="trash-2" class="w-4 h-4 mr-2"></span> Hapus Berdasarkan Filter (<span id="filtered-count">0</span>)
-                        </button>
+                        
+                        <div class="flex space-x-3 w-full md:w-auto">
+                            <button onclick="openGoogleSheetLink()" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center">
+                                <span data-lucide="external-link" class="w-4 h-4 mr-2"></span> Edit Data di Sheet
+                            </button>
+                            <!-- NEW BULK DELETE BUTTON (Perbaikan 3) -->
+                            <button onclick="handleDeleteFilteredStudents()" type="button" id="bulk-delete-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center disabled:opacity-50" disabled>
+                                <span data-lucide="trash-2" class="w-4 h-4 mr-2"></span> Hapus Berdasarkan Filter (<span id="filtered-count">0</span>)
+                            </button>
+                        </div>
                     </div>
-                </div>
 
                 <div id="admin-student-list-container" class="overflow-x-auto rounded-lg shadow-lg border mb-6">
                     <table class="min-w-full divide-y divide-gray-200">
@@ -1819,7 +1925,7 @@
                         </tbody>
                     </table>
                 </div>
-                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 flex items-center justify-center print-hidden">
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 flex items-center justify-center print-hidden">
                     <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Perubahan Data Massal
                 </button>
             </form>
@@ -1858,7 +1964,7 @@
                  console.error(`Gagal memuat riwayat absensi: Aksi "getStudentHistory" tidak dikenali di Apps Script.`);
                  showModal('Konfigurasi Server', 'Error: Aksi "getStudentHistory" tidak dikenali. Harap update Code.gs dan Redeploy Apps Script sebagai Versi Baru!', 'error', 7000);
              } else {
-                 console.error(`Gagal memuat riwayat absensi: ${result ? result.message : 'Unknown Error'}`);
+                console.error(`Gagal memuat riwayat absensi: ${result ? result.message : 'Unknown Error'}`);
              }
         }
     }
@@ -1918,7 +2024,7 @@
         }
     }
     
-    // --- Teacher Recap Handlers ---
+    // --- Teacher Recap Handlers (Detail Harian) ---
 
     function setupTeacherRecapListeners() {
         const form = document.getElementById('teacher-recap-form');
@@ -1929,7 +2035,56 @@
             const jurusan = document.getElementById('rekap-jurusan').value;
             const periode = document.getElementById('rekap-periode').value;
 
-            displayRecap(kelas, jurusan, periode, 'recap-results', 'recap-message', 'recap-table-body', 'recap-chart');
+            displayRecap(kelas, jurusan, periode, 'recap-results', 'recap-message', 'recap-table-body', 'recap-chart', 'getRecap');
+        });
+    }
+
+    // NEW HANDLER: Teacher Total Recap
+    function setupTeacherTotalRecapListeners() {
+        const form = document.getElementById('rekap-total-form');
+        const periodeSelect = document.getElementById('total-rekap-periode');
+        const startDateGroup = document.getElementById('custom-date-group-start');
+        const endDateGroup = document.getElementById('custom-date-group-end');
+
+        if (!form) return;
+        
+        periodeSelect.addEventListener('change', (e) => {
+            if (e.target.value === 'custom') {
+                startDateGroup.classList.remove('hidden');
+                endDateGroup.classList.remove('hidden');
+            } else {
+                startDateGroup.classList.add('hidden');
+                endDateGroup.classList.add('hidden');
+            }
+        });
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const kelas = document.getElementById('total-rekap-kelas').value;
+            const jurusan = document.getElementById('total-rekap-jurusan').value;
+            const periode = periodeSelect.value;
+            let startDate = '';
+            let endDate = '';
+            let isValid = true;
+
+            if (periode === 'custom') {
+                startDate = document.getElementById('total-rekap-start-date').value;
+                endDate = document.getElementById('total-rekap-end-date').value;
+                if (!startDate || !endDate) {
+                    showModal('Validasi Input', 'Harap lengkapi tanggal Mulai dan Akhir untuk periode khusus.', 'error', 3000);
+                    isValid = false;
+                } else if (new Date(startDate) > new Date(endDate)) {
+                    showModal('Validasi Tanggal', 'Tanggal Mulai tidak boleh lebih dari Tanggal Akhir.', 'error', 3000);
+                    isValid = false;
+                }
+            } else if (!periode) {
+                 showModal('Validasi Input', 'Harap pilih Kelas, Jurusan, dan Periode yang valid.', 'error', 3000);
+                 isValid = false;
+            }
+
+            if (isValid) {
+                displayTotalRecap(kelas, jurusan, periode, startDate, endDate);
+            }
         });
     }
 
@@ -2773,62 +2928,7 @@
         }
     }
 
-    // --- Admin Configuration Handlers ---
-
-    function setupAdminConfigurationListeners() {
-        const form = document.getElementById('admin-config-form');
-        const applyBase64Btn = document.getElementById('apply-base64-btn');
-        const logoUrlInput = document.getElementById('config-logo-url');
-        const nameInput = document.getElementById('config-school-name');
-
-        // Set initial values (for state consistency)
-        nameInput.value = APP_CONFIG.SCHOOL_NAME;
-        logoUrlInput.value = APP_CONFIG.LOGO_URL;
-
-        if (!form || !applyBase64Btn) return;
-
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const newName = nameInput.value.trim();
-            const newLogoUrl = logoUrlInput.value.trim();
-
-            if (!newName) { showModal('Peringatan', 'Nama sekolah tidak boleh kosong.', 'error', 3000); return; }
-            if (!newLogoUrl) { showModal('Peringatan', 'URL logo tidak boleh kosong.', 'error', 3000); return; }
-            
-            const tempImg = new Image();
-            tempImg.onload = function() {
-                APP_CONFIG.SCHOOL_NAME = newName;
-                APP_CONFIG.LOGO_URL = newLogoUrl;
-                updateHeaderDisplay();
-                showModal('Konfigurasi Berhasil', 'Nama sekolah dan logo berhasil diperbarui.', 'success', 3000);
-            };
-            tempImg.onerror = function() {
-                showModal('Gagal Memuat Logo', `URL logo gagal dimuat/diakses. Harap periksa apakah tautan adalah Tautan Langsung (Direct Link) yang dapat diakses publik. Jika gagal terus, gunakan opsi Base64 di bawah.`, 'error', 7000);
-            };
-
-            tempImg.src = newLogoUrl;
-        });
-
-        applyBase64Btn.addEventListener('click', function() {
-            const base64String = document.getElementById('config-logo-base64').value.trim();
-            const nameInputVal = document.getElementById('config-school-name').value.trim();
-
-            if (!nameInputVal) { showModal('Peringatan', 'Nama sekolah harus diisi sebelum menyimpan Base64.', 'error', 3000); return; }
-
-            if (base64String.startsWith('data:image/')) {
-                APP_CONFIG.SCHOOL_NAME = nameInputVal;
-                APP_CONFIG.LOGO_URL = base64String;
-                logoUrlInput.value = base64String;
-                updateHeaderDisplay();
-                showModal('Konfigurasi Base64 Berhasil', 'Logo berhasil diperbarui dari Base64.', 'success', 3000);
-            } else {
-                showModal('Peringatan Base64', 'String yang ditempel tidak terlihat seperti format Base64 yang valid (harus diawali dengan "data:image/").', 'error', 5000);
-            }
-        });
-    }
-
-    // --- Admin Recap Listener ---
+    // --- Admin Recap Listener (Detail Harian) ---
 
     function setupAdminRecapListeners() {
         const form = document.getElementById('admin-recap-form');
@@ -2839,7 +2939,7 @@
             const jurusan = document.getElementById('admin-rekap-jurusan').value;
             const periode = document.getElementById('admin-rekap-periode').value;
 
-            displayRecap(kelas, jurusan, periode, 'admin-recap-results', 'admin-recap-message', 'admin-recap-table-body', 'admin-recap-chart');
+            displayRecap(kelas, jurusan, periode, 'admin-recap-results', 'admin-recap-message', 'admin-recap-table-body', 'admin-recap-chart', 'getRecap');
         });
     }
     
