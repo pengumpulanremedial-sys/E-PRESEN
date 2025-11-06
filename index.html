@@ -1196,15 +1196,28 @@
             <p class="text-white/90 mb-6">Lihat perbandingan demografi dan persentase kehadiran siswa antar Kelas atau Jurusan.</p>
             <div class="glass-element p-5 rounded-lg shadow-inner mb-8 print-hidden">
                 <form id="comparison-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div class="col-span-2">
+                    <!-- Kriteria Perbandingan -->
+                    <div>
                         <label for="comparison-filter" class="block text-sm font-medium text-white/90">Kriteria Perbandingan</label>
                         <select id="comparison-filter" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
-                            <option value="class" class="bg-indigo-700">Per Kelas</option>
-                            <option value="major" class="bg-indigo-700">Per Jurusan</option>
+                            <option value="class" class="bg-indigo-700">Per Kelas (X RPL 1, X RPL 2)</option>
+                            <option value="major" class="bg-indigo-700">Per Jurusan & Tingkat (X RPL, XI RPL)</option>
                         </select>
                     </div>
-                    <div class="col-span-2">
-                        <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
+                    <!-- Tingkatan Kelas (Filter Baru) -->
+                    <div>
+                        <label for="comparison-grade-level" class="block text-sm font-medium text-white/90">Tingkatan Kelas</label>
+                        <select id="comparison-grade-level" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:focus:border-purple-500 glass-element">
+                            <option value="" class="bg-indigo-700">-- Semua Tingkat --</option>
+                            <option value="X" class="bg-indigo-700">X</option>
+                            <option value="XI" class="bg-indigo-700">XI</option>
+                            <option value="XII" class="bg-indigo-700">XII</option>
+                        </select>
+                    </div>
+                    <!-- Empty Div for alignment on md screens -->
+                    <div></div> 
+                    <div class="md:col-span-1">
+                        <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
                             <span data-lucide="eye" class="w-4 h-4 mr-2"></span> Tampilkan Grafik
                         </button>
                     </div>
@@ -1975,7 +1988,7 @@
         };
         // --- END Gradient Logic ---
 
-        const labels = Object.keys(data); // Nama Kelas/Jurusan
+        const labels = Object.keys(data); // Nama Kelas/Jurusan (or composite key)
         const statuses = ['Hadir', 'Izin', 'Sakit', 'Alpha'];
 
         const datasets = statuses.map(status => ({
@@ -1989,7 +2002,14 @@
             borderSkipped: false,
         }));
         
-        const chartTitleAttend = filterType === 'class' ? 'Persentase Kehadiran per Kelas' : 'Persentase Kehadiran per Jurusan';
+        // Dynamic title based on filterType
+        let chartTitleAttend;
+        if (filterType === 'class') {
+            chartTitleAttend = 'Persentase Kehadiran per Kelas';
+        } else if (filterType === 'major') {
+            const gradeLevel = document.getElementById('comparison-grade-level').value;
+            chartTitleAttend = `Persentase Kehadiran per Jurusan & Tingkat (${gradeLevel || 'Semua Tingkat'})`;
+        }
 
 
         const newChart = new Chart(ctx.canvas, {
@@ -1998,7 +2018,7 @@
             options: {
                 responsive: true, maintainAspectRatio: false,
                 plugins: {
-                    title: { display: true, text: chartTitleAttend, font: { size: 18, weight: 'bold', family: 'Inter' }, color: '#fff' },
+                    title: { display: true, text: chartTitleAttend, font: { size: 18, weight: 'bold', family: 'Inter' }, color: '#fff' }, // UPDATED: uses local chartTitleAttend
                     legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 14 }, color: '#e5e7eb' } },
                     tooltip: {
                         mode: 'index',
@@ -2443,8 +2463,9 @@
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
         // 1. Fetch Comparison Data
-        // Ganti 'getComparisonData' dengan fungsi di Apps Script Anda
-        const url = `${WEB_APP_URL}?action=getComparisonData&filterType=${filterType}&role=${currentUser.role}&nip=${currentUser.nip || ''}`;
+        const gradeLevel = document.getElementById('comparison-grade-level').value; // NEW
+
+        const url = `${WEB_APP_URL}?action=getComparisonData&filterType=${filterType}&gradeLevel=${gradeLevel}&role=${currentUser.role}&nip=${currentUser.nip || ''}`; // UPDATED URL
         const result = await fetchData(url);
 
         if (!result || result.status !== 'success' || !result.demographic || !result.attendance_percent) {
@@ -2464,7 +2485,12 @@
         }
 
         // 2. Render Demographic Chart
-        const chartTitleDemo = filterType === 'class' ? 'Jumlah Total Siswa per Kelas' : 'Jumlah Total Siswa per Jurusan';
+        let chartTitleDemo;
+        if (filterType === 'class') {
+            chartTitleDemo = 'Jumlah Total Siswa per Kelas';
+        } else if (filterType === 'major') {
+            chartTitleDemo = `Jumlah Total Siswa per Jurusan & Tingkat (${gradeLevel || 'Semua Tingkat'})`; // UPDATED TITLE
+        }
         renderDemographicChart('comparison-chart', demographicData, chartTitleDemo);
         demoContainer.classList.remove('hidden');
         document.getElementById('comparison-chart-title').textContent = chartTitleDemo;
