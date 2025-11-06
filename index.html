@@ -1408,10 +1408,11 @@
             let html = '';
             filteredRecords.forEach((r, index) => {
                 let statusColor = '';
+                // PERBAIKAN: Memberikan warna merah yang lebih jelas untuk Alpha
                 if (r.status === 'Hadir') statusColor = 'text-emerald-300 bg-emerald-700/30';
                 else if (r.status === 'Izin') statusColor = 'text-amber-300 bg-amber-700/30';
                 else if (r.status === 'Sakit') statusColor = 'text-red-300 bg-red-700/30';
-                else if (r.status === 'Alpha') statusColor = 'text-gray-300 bg-gray-700/30';
+                else if (r.status === 'Alpha') statusColor = 'text-red-300 bg-red-700/50 font-bold'; // Merah lebih kuat dan Bold
 
                 const displayNama = r.nama || 'Nama Tidak Ditemukan (Cek Apps Script)'; 
                 const formattedTime = formatDateTime(r.date, r.time);
@@ -1512,7 +1513,7 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-300">${hadirCount}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-amber-300">${izinCount}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-300">${sakitCount}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-white/70">${alphaCount}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-300">${alphaCount}</td>
                     </tr>
                 `;
             });
@@ -1648,11 +1649,11 @@
 
             historyRecords.forEach(record => {
                 let statusClass = '';
-                // NEW: Warna teks untuk status agar kontras dengan latar belakang gelap
+                // PERBAIKAN: Memberikan warna merah yang lebih jelas untuk Alpha
                 if (record.status === 'Hadir') statusClass = 'text-emerald-300 bg-emerald-700/30';
                 else if (record.status === 'Izin') statusClass = 'text-amber-300 bg-amber-700/30';
                 else if (record.status === 'Sakit') statusClass = 'text-red-300 bg-red-700/30';
-                else statusClass = 'text-gray-300 bg-gray-700/30';
+                else if (record.status === 'Alpha') statusClass = 'text-red-300 bg-red-700/50 font-bold'; // Merah lebih kuat dan Bold
                 
                 const formattedTime = formatDateTime(record.date, record.time);
 
@@ -1878,7 +1879,7 @@
                                 <th class="px-6 py-3 text-center text-xs font-bold text-emerald-300 uppercase tracking-wider">Hadir</th>
                                 <th class="px-6 py-3 text-center text-xs font-bold text-amber-300 uppercase tracking-wider">Izin</th>
                                 <th class="px-6 py-3 text-center text-xs font-bold text-red-300 uppercase tracking-wider">Sakit</th>
-                                <th class="px-6 py-3 text-center text-xs font-bold text-white uppercase tracking-wider">Alpha</th>
+                                <th class="px-6 py-3 text-center text-xs font-bold text-red-300 uppercase tracking-wider">Alpha</th>
                             </tr>
                         </thead>
                         <tbody id="total-recap-table-body" class="bg-white/10 divide-y divide-white/20">
