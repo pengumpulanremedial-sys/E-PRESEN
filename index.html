@@ -44,7 +44,7 @@
             border-color: rgba(255, 255, 255, 0.3);
         }
         .glass-element::placeholder {
-             color: rgba(255, 255, 255, 0.6);
+            color: rgba(255, 255, 255, 0.6);
         }
         
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
@@ -474,7 +474,7 @@
         teacher: [
             { id: 'rekap-guru', label: 'Rekap Detail Harian', icon: 'file-text' }, // Existing Detail Recap
             { id: 'rekap-total', label: 'Rekap Total Absen', icon: 'bar-chart-2' }, // NEW Total Recap
-            { id: 'perbandingan', label: 'Perbandingan Kelas', icon: 'bar-chart-3' },
+            { id: 'dashboard-grafik', label: 'Dashboard Grafik', icon: 'bar-chart-3' }, // RENAMED
             { id: 'absensi-siswa', label: 'Absensi Manual Siswa', icon: 'calendar-check' }, 
             { id: 'penilaian', label: 'Input Penilaian', icon: 'file-plus' },
             { id: 'profil', label: 'Profil Saya', icon: 'user' },
@@ -922,7 +922,7 @@
                 <h3 class="text-2xl font-bold text-white mb-6 flex items-center">
                     <span data-lucide="history" class="w-6 h-6 mr-2"></span> Riwayat Absensi Saya
                 </h3>
-        `;
+            `;
 
         if (historyRecords.length === 0) {
             historyHtml += `<p class="text-white/70 text-center py-4">Belum ada riwayat absensi yang tercatat.</p>`;
@@ -1192,12 +1192,12 @@
         if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
 
         return `
-            <h3 class="text-2xl font-bold text-white mb-6">Perbandingan Demografi dan Kehadiran Kelas & Jurusan</h3>
-            <p class="text-white/90 mb-6">Pilih kriteria perbandingan yang ingin Anda lihat.</p>
+            <h3 class="text-2xl font-bold text-white mb-6">Dashboard Grafik Analisis Kehadiran</h3>
+            <p class="text-white/90 mb-6">Lihat perbandingan demografi dan persentase kehadiran siswa antar Kelas atau Jurusan.</p>
             <div class="glass-element p-5 rounded-lg shadow-inner mb-8 print-hidden">
                 <form id="comparison-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div class="col-span-2">
-                        <label for="comparison-filter" class="block text-sm font-medium text-white/90">Jenis Kriteria Perbandingan</label>
+                        <label for="comparison-filter" class="block text-sm font-medium text-white/90">Kriteria Perbandingan</label>
                         <select id="comparison-filter" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
                             <option value="class" class="bg-indigo-700">Per Kelas</option>
                             <option value="major" class="bg-indigo-700">Per Jurusan</option>
@@ -1205,30 +1205,30 @@
                     </div>
                     <div class="col-span-2">
                         <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
-                            <span data-lucide="eye" class="w-4 h-4 mr-2"></span> Tampilkan Perbandingan
+                            <span data-lucide="eye" class="w-4 h-4 mr-2"></span> Tampilkan Grafik
                         </button>
                     </div>
                 </form>
             </div>
 
             <div id="comparison-results" class="space-y-10">
-                <div id="comparison-message" class="text-center text-white/70 py-10">Pilih jenis perbandingan untuk menampilkan grafik.</div>
+                <div id="comparison-message" class="text-center text-white/70 py-10">Pilih kriteria perbandingan di atas untuk menampilkan grafik.</div>
 
                 <!-- Chart 1: Demografi (Jumlah Siswa Total) -->
                 <div id="comparison-chart-container" class="hidden p-6 glass-container rounded-xl modern-shadow border-white/30">
-                    <h4 id="comparison-chart-title" class="text-xl font-bold text-white mb-4 flex items-center"><span data-lucide="bar-chart-2" class="w-5 h-5 mr-2 text-blue-300"></span> Grafik Demografi Siswa</h4>
+                    <h4 id="comparison-chart-title" class="text-xl font-bold text-white mb-4 flex items-center"><span data-lucide="bar-chart-2" class="w-5 h-5 mr-2 text-blue-300"></span> Grafik Demografi Siswa (Total)</h4>
                     <div class="chart-container relative h-96 md:h-[500px]">
                         <canvas id="comparison-chart"></canvas>
                     </div>
                 </div>
                 
-                <!-- NEW Chart 2: Persentase Kehadiran (Perbaikan 1) -->
-                    <div id="comparison-attendance-chart-container" class="hidden p-6 glass-container rounded-xl modern-shadow border-white/30">
-                        <h4 id="comparison-attendance-chart-title" class="text-xl font-bold text-emerald-300 mb-4 flex items-center"><span data-lucide="pie-chart" class="w-5 h-5 mr-2"></span> Grafik Persentase Kehadiran</h4>
-                        <div class="chart-container relative h-96 md:h-[500px]">
-                            <canvas id="comparison-attendance-chart"></canvas>
-                        </div>
+                <!-- Chart 2: Persentase Kehadiran (Stacked Bar Chart) -->
+                <div id="comparison-attendance-chart-container" class="hidden p-6 glass-container rounded-xl modern-shadow border-white/30">
+                    <h4 id="comparison-attendance-chart-title" class="text-xl font-bold text-emerald-300 mb-4 flex items-center"><span data-lucide="pie-chart" class="w-5 h-5 mr-2"></span> Grafik Persentase Kehadiran (Hadir, Izin, Sakit, Alpha)</h4>
+                    <div class="chart-container relative h-96 md:h-[500px]">
+                        <canvas id="comparison-attendance-chart"></canvas>
                     </div>
+                </div>
 
             </div>
         `;
@@ -1468,9 +1468,9 @@
                         </select>
                     </div>
                     <div class="col-span-1 md:col-span-4 flex justify-end">
-                              <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-6 rounded-lg flex items-center justify-center transition duration-200 modern-hover">
-                                  <span data-lucide="filter" class="w-4 h-4 mr-2"></span> Terapkan Filter
-                              </button>
+                             <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-6 rounded-lg flex items-center justify-center transition duration-200 modern-hover">
+                                 <span data-lucide="filter" class="w-4 h-4 mr-2"></span> Terapkan Filter
+                             </button>
                     </div>
                 </form>
             </div>
@@ -1513,8 +1513,8 @@
                     </table>
                 </div>
                             <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
-                    <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Perubahan Data Massal
-                </button>
+                        <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Perubahan Data Massal
+                    </button>
             </form>
         `;
     }
@@ -1593,7 +1593,7 @@
                 contentDiv.innerHTML = renderTeacherTotalRecap();
                 setupTeacherTotalRecapListeners();
                 break;
-            case 'perbandingan':
+            case 'dashboard-grafik': // RENAMED
                 contentDiv.innerHTML = renderTeacherComparison();
                 setupTeacherComparisonListeners(); 
                 break;
@@ -1925,7 +1925,11 @@
                         borderColor: '#38bdf8',
                         borderWidth: 1,
                         boxPadding: 8,
+                        usePointStyle: true,
                     } 
+                },
+                layout: {
+                    padding: { top: 10, bottom: 10 }
                 },
                 scales: {
                     y: { 
@@ -1947,7 +1951,7 @@
     }
     
     // NEW: Render chart untuk Kehadiran (Perbaikan 1)
-    function renderAttendanceComparisonChart(canvasId, data, chartTitle) {
+    function renderAttendanceComparisonChart(canvasId, data, filterType) {
         const ctx = document.getElementById(canvasId).getContext('2d');
 
         // FIX: Ensure previous instance is destroyed
@@ -1984,6 +1988,9 @@
             borderRadius: 5, // Added rounding
             borderSkipped: false,
         }));
+        
+        const chartTitleAttend = filterType === 'class' ? 'Persentase Kehadiran per Kelas' : 'Persentase Kehadiran per Jurusan';
+
 
         const newChart = new Chart(ctx.canvas, {
             type: 'bar',
@@ -1991,7 +1998,7 @@
             options: {
                 responsive: true, maintainAspectRatio: false,
                 plugins: {
-                    title: { display: true, text: chartTitle, font: { size: 18, weight: 'bold', family: 'Inter' }, color: '#fff' },
+                    title: { display: true, text: chartTitleAttend, font: { size: 18, weight: 'bold', family: 'Inter' }, color: '#fff' },
                     legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 14 }, color: '#e5e7eb' } },
                     tooltip: {
                         mode: 'index',
@@ -2003,7 +2010,7 @@
                         borderWidth: 1,
                         boxPadding: 8,
                         callbacks: {
-                            label: (context) => `${context.dataset.label}: ${context.parsed.y}%`,
+                            label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(2)}%`, // Display percentage with 2 decimals
                             title: (context) => `${context[0].label} (Total: ${data[context[0].label].TotalRecords} records)`
                         }
                     }
@@ -2019,6 +2026,10 @@
                         beginAtZero: true, 
                         max: 100, 
                         title: { display: true, text: 'Persentase Kehadiran (%)', font: { size: 14 }, color: '#e5e7eb' },
+                        ticks: { 
+                            callback: function(value) { return value + '%'; }, // Add % to tick labels
+                            color: '#e5e7eb' 
+                        },
                         grid: { color: 'rgba(255, 255, 255, 0.15)' }
                     }
                 }
@@ -2244,580 +2255,6 @@
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
-    function renderTeacherComparison() {
-        if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; }
-        if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
-
-        return `
-            <h3 class="text-2xl font-bold text-white mb-6">Perbandingan Demografi dan Kehadiran Kelas & Jurusan</h3>
-            <p class="text-white/90 mb-6">Pilih kriteria perbandingan yang ingin Anda lihat.</p>
-            <div class="glass-element p-5 rounded-lg shadow-inner mb-8 print-hidden">
-                <form id="comparison-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div class="col-span-2">
-                        <label for="comparison-filter" class="block text-sm font-medium text-white/90">Jenis Kriteria Perbandingan</label>
-                        <select id="comparison-filter" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
-                            <option value="class" class="bg-indigo-700">Per Kelas</option>
-                            <option value="major" class="bg-indigo-700">Per Jurusan</option>
-                        </select>
-                    </div>
-                    <div class="col-span-2">
-                        <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
-                            <span data-lucide="eye" class="w-4 h-4 mr-2"></span> Tampilkan Perbandingan
-                        </button>
-                    </div>
-                </form>
-            </div>
-
-            <div id="comparison-results" class="space-y-10">
-                <div id="comparison-message" class="text-center text-white/70 py-10">Pilih jenis perbandingan untuk menampilkan grafik.</div>
-
-                <!-- Chart 1: Demografi (Jumlah Siswa Total) -->
-                <div id="comparison-chart-container" class="hidden p-6 glass-container rounded-xl modern-shadow border-white/30">
-                    <h4 id="comparison-chart-title" class="text-xl font-bold text-white mb-4 flex items-center"><span data-lucide="bar-chart-2" class="w-5 h-5 mr-2 text-blue-300"></span> Grafik Demografi Siswa</h4>
-                    <div class="chart-container relative h-96 md:h-[500px]">
-                        <canvas id="comparison-chart"></canvas>
-                    </div>
-                </div>
-                
-                <!-- NEW Chart 2: Persentase Kehadiran (Perbaikan 1) -->
-                    <div id="comparison-attendance-chart-container" class="hidden p-6 glass-container rounded-xl modern-shadow border-white/30">
-                        <h4 id="comparison-attendance-chart-title" class="text-xl font-bold text-emerald-300 mb-4 flex items-center"><span data-lucide="pie-chart" class="w-5 h-5 mr-2"></span> Grafik Persentase Kehadiran</h4>
-                        <div class="chart-container relative h-96 md:h-[500px]">
-                            <canvas id="comparison-attendance-chart"></canvas>
-                        </div>
-                    </div>
-
-            </div>
-        `;
-    }
-
-    function renderTeacherStudentAttendance() {
-        const currentDate = new Date().toISOString().split('T')[0];
-
-        return `
-            <h3 class="text-2xl font-bold text-white mb-6">Input / Edit Absensi Siswa (Manual)</h3>
-            <div class="glass-element p-5 rounded-lg shadow-inner mb-6 print-hidden">
-                <form id="manual-attendance-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div>
-                        <label for="manual-kelas" class="block text-sm font-medium text-white/90">Kelas</label>
-                        <select id="manual-kelas" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Pilih Kelas --</option>
-                            ${currentUser.kelasAjar ? currentUser.kelasAjar.map(c => `<option value="${c}" class="bg-indigo-700">${c}</option>`).join('') : `<option value="" class="bg-indigo-700">(Data Kelas tidak tersedia)</option>`}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="manual-jurusan" class="block text-sm font-medium text-white/90">Jurusan</label>
-                        <select id="manual-jurusan" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Pilih Jurusan --</option>
-                            ${currentUser.jurusanAjar ? currentUser.jurusanAjar.map(j => `<option value="${j}" class="bg-indigo-700">${j}</option>`).join('') : `<option value="" class="bg-indigo-700">(Data Jurusan tidak tersedia)</option>`}
-                        </select>
-                    </div>
-                     <div>
-                        <label for="manual-date" class="block text-sm font-medium text-white/90">Tanggal Absensi</label>
-                        <input type="date" id="manual-date" value="${currentDate}" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
-                    </div>
-                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
-                        <span data-lucide="list-checks" class="w-4 h-4 mr-2"></span> Load Siswa
-                    </button>
-                </form>
-            </div>
-            
-            <div id="manual-attendance-area" class="mt-8">
-                            <p id="manual-message" class="text-center text-white/70 py-10">Pilih Kelas, Jurusan, dan Tanggal untuk memuat daftar siswa.</p>
-                        
-                            <!-- Student List Table (will be populated dynamically) -->
-                            <form id="manual-attendance-submit-form" class="hidden">
-                            <div id="student-list-container" class="overflow-x-auto rounded-lg shadow-lg border border-white/30 mb-6">
-                                <table class="min-w-full divide-y divide-white/20">
-                                    <thead class="glass-element">
-                                        <tr>
-                                            <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">NISN</th>
-                                            <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Nama Siswa</th>
-                                            <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Status</th>
-                                            <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Keterangan</th>
-                                            <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider print-hidden">Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="student-list-body" class="bg-white/10 divide-y divide-white/20">
-                                        <!-- Student rows here -->
-                                    </tbody>
-                                </table>
-                            </div>
-                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
-                                <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Absensi Massal
-                            </button>
-                            </form>
-            </div>
-        `;
-    }
-
-    function renderTeacherAssessment() {
-        const currentDate = new Date().toISOString().split('T')[0];
-
-        return `
-            <h3 class="text-2xl font-bold text-white mb-6 flex items-center"><span data-lucide="file-plus" class="w-6 h-6 mr-2"></span> Input Penilaian Siswa</h3>
-            <p class="text-white/90 mb-6">Input nilai akan diperbarui ke Google Sheet.</p>
-            <div class="glass-element p-5 rounded-xl shadow-inner mb-6 print-hidden">
-                <form id="assessment-load-form" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                    <div>
-                        <label for="assessment-type" class="block text-sm font-medium text-white/90">Jenis Penilaian</label>
-                        <select id="assessment-type" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-green-500 focus:border-green-500 glass-element">
-                            <option value="harian" class="bg-indigo-700">Penilaian Harian</option>
-                            <option value="pts" class="bg-indigo-700">Penilaian Tengah Semester (PTS)</option>
-                            <option value="pas" class="bg-indigo-700">Penilaian Akhir Semester (PAS)</option>
-                        </select>
-                    </div>
-                    <div id="assessment-date-group">
-                        <label for="assessment-date" class="block text-sm font-medium text-white/90">Tanggal Penilaian</label>
-                        <input type="date" id="assessment-date" value="${currentDate}" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-green-500 focus:border-green-500 glass-element">
-                    </div>
-                    <div>
-                        <label for="assessment-kelas" class="block text-sm font-medium text-white/90">Kelas</label>
-                        <select id="assessment-kelas" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-green-500 focus:border-green-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Pilih Kelas --</option>
-                            ${currentUser.kelasAjar ? currentUser.kelasAjar.map(c => `<option value="${c}" class="bg-indigo-700">${c}</option>`).join('') : `<option value="" class="bg-indigo-700">(Data Kelas tidak tersedia)</option>`}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="assessment-jurusan" class="block text-sm font-medium text-white/90">Jurusan</label>
-                        <select id="assessment-jurusan" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-green-500 focus:border-green-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Pilih Jurusan --</option>
-                            ${currentUser.jurusanAjar ? currentUser.jurusanAjar.map(j => `<option value="${j}" class="bg-indigo-700">${j}</option>`).join('') : `<option value="" class="bg-indigo-700">(Data Jurusan tidak tersedia)</option>`}
-                        </select>
-                    </div>
-                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
-                        <span data-lucide="file-text" class="w-4 h-4 mr-2"></span> Muat Penilaian
-                    </button>
-                </form>
-            </div>
-            
-            <div id="assessment-area" class="mt-8">
-                <p id="assessment-message" class="text-center text-white/70 py-10">Pilih jenis penilaian, Kelas, dan Jurusan untuk memuat daftar siswa.</p>
-                
-                <form id="assessment-submit-form" class="hidden">
-                    <div id="assessment-student-list-container" class="overflow-x-auto rounded-lg shadow-lg border border-white/30 mb-6">
-                        <table class="min-w-full divide-y divide-white/20">
-                            <thead class="glass-element">
-                                <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">NISN</th>
-                                    <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Nama Siswa</th>
-                                    <th id="assessment-score-label" class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Nilai (0-100)</th>
-                                    <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider print-hidden">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody id="assessment-student-list-body" class="bg-white/10 divide-y divide-white/20">
-                                <!-- Student rows here -->
-                            </tbody>
-                        </table>
-                    </div>
-                    <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
-                        <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Nilai Massal
-                    </button>
-                </form>
-            </div>
-        `;
-    }
-
-    function renderAdminConfiguration() {
-        return `
-            <h3 class="text-2xl font-bold text-white mb-6">Konfigurasi Aplikasi</h3>
-            <p class="text-white/90 mb-6">Perbarui detail sekolah yang ditampilkan di header aplikasi.</p>
-            <div class="glass-element p-6 rounded-lg shadow-inner mb-8 print-hidden">
-                <form id="admin-config-form" class="space-y-6">
-                    <div>
-                        <label for="config-school-name" class="block text-sm font-medium text-white/90">Nama Sekolah</label>
-                        <input type="text" id="config-school-name" value="${APP_CONFIG.SCHOOL_NAME}" required placeholder="Contoh: SMK Sehati Karawang" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
-                    </div>
-                    <div>
-                        <label for="config-logo-url" class="block text-sm font-medium text-white/90">URL Logo Sekolah (Link Langsung)</label>
-                        <input type="url" id="config-logo-url" value="${APP_CONFIG.LOGO_URL}" required placeholder="Contoh: https://link-gambar-logo-anda.png" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
-                        <p class="text-xs text-white/70 mt-1">Gunakan link langsung (Direct Link) atau string Base64 di bawah.</p>
-                    </div>
-                    <div class="flex justify-end">
-                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center transition duration-200 modern-hover">
-                            <span data-lucide="save" class="w-4 h-4 mr-2"></span> Simpan Konfigurasi
-                        </button>
-                    </div>
-                </form>
-            </div>
-
-            <div class="glass-element p-6 rounded-lg shadow-md space-y-4 print-hidden">
-                <h4 class="text-lg font-bold text-white">Opsi Alternatif: Logo Base64</h4>
-                <div>
-                    <label for="config-logo-base64" class="block text-sm font-medium text-white/90">Tempel String Base64 Gambar</label>
-                    <textarea id="config-logo-base64" rows="3" placeholder="Contoh: data:image/png;base64,iVBORw0KGgoAAAAN..." class="w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 resize-none glass-element"></textarea>
-                </div>
-                <button id="apply-base64-btn" type="button" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center transition duration-200 modern-hover">
-                    <span data-lucide="image" class="w-4 h-4 mr-2"></span> Terapkan Logo dari Base64
-                </button>
-            </div>
-        `;
-    }
-
-    function renderAdminGlobalRecap() {
-        const allClasses = currentUser.kelasAjar || [];
-        const allMajors = currentUser.jurusanAjar || []; // DIPERBAIKI: Menggunakan jurusanAjar untuk Jurusan
-
-        return `
-            <h3 class="text-2xl font-bold text-white mb-6">Rekapitulasi Global Absensi Siswa (Detail Harian)</h3>
-            <div class="glass-element p-5 rounded-lg shadow-inner mb-6 print-hidden">
-                <form id="admin-recap-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div>
-                        <label for="admin-rekap-kelas" class="block text-sm font-medium text-white/90">Kelas</label>
-                        <select id="admin-rekap-kelas" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Semua Kelas --</option>
-                            ${allClasses.map(c => `<option value="${c}" class="bg-indigo-700">${c}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="admin-rekap-jurusan" class="block text-sm font-medium text-white/90">Jurusan</label>
-                        <select id="admin-rekap-jurusan" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Semua Jurusan --</option>
-                            ${allMajors.map(j => `<option value="${j}" class="bg-indigo-700">${j}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="admin-rekap-periode" class="block text-sm font-medium text-white/90">Periode</label>
-                        <select id="admin-rekap-periode" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
-                            <option value="harian" class="bg-indigo-700">Harian</option>
-                            <option value="mingguan" class="bg-indigo-700">Mingguan</option>
-                            <option value="bulanan" class="bg-indigo-700">Bulanan</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
-                        <span data-lucide="search" class="w-4 h-4 mr-2"></span> Tampilkan Data
-                    </button>
-                </form>
-            </div>
-            
-            <div id="admin-recap-results" class="hidden">
-                ${generateRecapResultsTemplate('admin-recap-chart')}
-            </div>
-            <div id="admin-recap-message" class="text-center text-white/70 py-10">Silahkan pilih filter untuk melihat rekap data.</div>
-        `;
-    }
-
-    function renderAdminManagement() {
-        const allClasses = currentUser.kelasAjar || [];
-        const allMajors = currentUser.jurusanAjar || [];
-        
-        return `
-            <h3 class="text-2xl font-bold text-white mb-6">Manajemen Data Siswa</h3>
-            <p class="text-white/90 mb-6">Kelola data siswa, termasuk penambahan, pengeditan, dan penghapusan massal.</p>
-            <div class="glass-element p-5 rounded-lg shadow-inner mb-6 print-hidden">
-                <form id="admin-management-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div class="md:col-span-2">
-                        <label for="admin-search-student" class="block text-sm font-medium text-white/90">Cari NISN/Nama</label>
-                        <input type="text" id="admin-search-student" placeholder="Ketik NISN atau Nama Siswa" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
-                    </div>
-                    <div>
-                        <label for="admin-filter-kelas" class="block text-sm font-medium text-white/90">Kelas</label>
-                        <select id="admin-filter-kelas" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Semua Kelas --</option>
-                            ${allClasses.map(c => `<option value="${c}" class="bg-indigo-700">${c}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="admin-filter-jurusan" class="block text-sm font-medium text-white/90">Jurusan</label>
-                        <select id="admin-filter-jurusan" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Semua Jurusan --</option>
-                            ${allMajors.map(j => `<option value="${j}" class="bg-indigo-700">${j}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div class="col-span-1 md:col-span-4 flex justify-end">
-                              <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-6 rounded-lg flex items-center justify-center transition duration-200 modern-hover">
-                                  <span data-lucide="filter" class="w-4 h-4 mr-2"></span> Terapkan Filter
-                              </button>
-                    </div>
-                </form>
-            </div>
-            
-            <p id="admin-management-message" class="text-center text-white/70 py-10">Memuat data siswa...</p>
-            
-            <form id="admin-student-update-form" class="hidden">
-                             <div class="flex flex-col space-y-3 md:flex-row justify-between items-center mb-4 md:space-y-0 print-hidden">
-                             <button type="button" onclick="openAddStudentModal()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center transition duration-200 modern-hover">
-                                 <span data-lucide="user-plus" class="w-4 h-4 mr-2"></span> Tambah Siswa Baru
-                             </button>
-                             
-                             <div class="flex space-x-3 w-full md:w-auto">
-                                 <button onclick="openGoogleSheetLink()" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center transition duration-200 modern-hover">
-                                     <span data-lucide="external-link" class="w-4 h-4 mr-2"></span> Edit Data di Sheet
-                                 </button>
-                                 <!-- NEW BULK DELETE BUTTON (Perbaikan 3) -->
-                                 <button onclick="handleDeleteFilteredStudents()" type="button" id="bulk-delete-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center disabled:opacity-50" disabled>
-                                     <span data-lucide="trash-2" class="w-4 h-4 mr-2"></span> Hapus Berdasarkan Filter (<span id="filtered-count">0</span>)
-                                 </button>
-                             </div>
-                     </div>
-
-                <div id="admin-student-list-container" class="overflow-x-auto rounded-lg shadow-lg border border-white/30 mb-6">
-                    <table class="min-w-full divide-y divide-white/20">
-                        <thead class="glass-element">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">NISN (KEY)</th>
-                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Nama Siswa</th>
-                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Kelas</th>
-                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Jurusan</th>
-                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Email</th>
-                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider print-hidden">Password</th>
-                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider print-hidden">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody id="admin-student-list-body" class="bg-white/10 divide-y divide-white/20">
-                            <!-- Student rows here -->
-                        </tbody>
-                    </table>
-                </div>
-                            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
-                    <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Perubahan Data Massal
-                </button>
-            </form>
-        `;
-    }
-
-    // ====================================================================
-    // --- 4. CORE LOGIC (LOGIN, NAVIGATION, STATE) ---
-    // ====================================================================
-    
-    function renderDashboardTabs() {
-        const tabsContainer = document.querySelector('#dashboard-tabs nav');
-        tabsContainer.innerHTML = '';
-
-        TABS[currentUser.role].forEach(tab => {
-            const button = document.createElement('button');
-            button.id = `tab-${tab.id}`;
-            // NEW: Warna tab disesuaikan agar kontras elegan
-            button.className = `flex items-center px-4 py-2 text-sm font-medium rounded-t-lg transition-colors duration-150 text-white/70 hover:text-white hover:bg-white/10`;
-            button.innerHTML = `<span data-lucide="${tab.icon}" class="w-4 h-4 mr-2"></span>${tab.label}`;
-            button.onclick = () => selectTab(tab.id);
-            tabsContainer.appendChild(button);
-        });
-
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
-    
-    async function renderTabContent(tabId) {
-        const contentDiv = document.getElementById('tab-content');
-        // PERBAIKAN: Kontras dan Ukuran Loading Message
-        contentDiv.innerHTML = `<div class="flex flex-col justify-center items-center py-10">
-            <div class="animate-spin mb-4">
-                <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
-            </div>
-            <span class="text-white text-lg font-bold">Memuat data...</span>
-        </div>`;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-        hideMiniPopup();
-
-        if (tabId === 'absensi') {
-            await Promise.all([checkStudentAttendanceStatus(), getStudentHistory()]);
-        }
-        
-        contentDiv.innerHTML = '';
-
-        if (recapChartInstance) { recapChartInstance.destroy(); recapChartInstance = null; }
-        if (adminRecapChartInstance) { adminRecapChartInstance.destroy(); adminRecapChartInstance = null; }
-        // FIX: Ensure both comparison chart instances are destroyed
-        if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; } 
-        if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
-
-        if (tabId !== 'rekap-guru' && tabId !== 'rekap-admin') {
-            currentRecapData = [];
-        }
-        
-        if (tabId !== 'rekap-total') {
-            currentTotalRecapData = []; // Clear total recap state on tab change
-        }
-
-        currentRecapFilters = {}; // Clear print filters on tab change
-
-
-        switch (tabId) {
-            case 'absensi':
-                contentDiv.innerHTML = renderStudentAttendanceForm();
-                contentDiv.insertAdjacentHTML('beforeend', renderStudentAttendanceHistory());
-                setupAttendanceFormListeners();
-                break;
-            case 'profil':
-                contentDiv.innerHTML = renderProfilePage();
-                break;
-            case 'rekap-guru':
-                contentDiv.innerHTML = renderTeacherRecap();
-                setupTeacherRecapListeners();
-                break;
-            // NEW CASE: Rekap Total Absen
-            case 'rekap-total':
-                contentDiv.innerHTML = renderTeacherTotalRecap();
-                setupTeacherTotalRecapListeners();
-                break;
-            case 'perbandingan':
-                contentDiv.innerHTML = renderTeacherComparison();
-                setupTeacherComparisonListeners(); 
-                break;
-            case 'absensi-siswa':
-                contentDiv.innerHTML = renderTeacherStudentAttendance();
-                setupTeacherStudentAttendanceListeners(); 
-                break;
-            case 'penilaian':
-                contentDiv.innerHTML = renderTeacherAssessment();
-                setupTeacherAssessmentListeners();
-                break;
-            case 'rekap-admin':
-                contentDiv.innerHTML = renderAdminGlobalRecap();
-                setupAdminRecapListeners();
-                break;
-            case 'konfigurasi':
-                contentDiv.innerHTML = renderAdminConfiguration();
-                setupAdminConfigurationListeners(); // NEW HANDLER
-                break;
-            case 'manajemen':
-                contentDiv.innerHTML = renderAdminManagement();
-                setupAdminManagementListeners();
-                break;
-            default:
-                contentDiv.innerHTML = `<p class="text-center text-gray-500 py-10">Pilih menu di atas.</p>`;
-        }
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
-
-
-    function selectRole(roleId) {
-        currentRole = roleId;
-
-        if (roleId) {
-            const roleInfo = Object.values(ROLE_MAP).find(r => r.id === roleId);
-
-            Object.keys(ROLE_MAP).forEach(key => {
-                const role = ROLE_MAP[key];
-                // NEW: Menggunakan warna transparan untuk tombol yang tidak aktif
-                const btn = document.getElementById(`role-btn-${role.id}`);
-                btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg');
-                btn.classList.add('bg-white/20', 'text-white', 'hover:bg-white/40');
-            });
-            const selectedBtn = document.getElementById(`role-btn-${roleId}`);
-            
-            if (selectedBtn) {
-                // NEW: Menggunakan gradien untuk tombol yang aktif
-                selectedBtn.classList.remove('bg-white/20', 'text-white', 'hover:bg-white/40');
-                selectedBtn.classList.add('bg-gradient-to-r', 'from-blue-500', 'to-indigo-600', 'text-white', 'shadow-lg', 'shadow-blue-500/50');
-
-                const loginForm = document.getElementById('login-form');
-                const loginTitle = document.getElementById('login-title');
-                const usernameLabel = document.getElementById('username-label');
-                const usernameInput = document.getElementById('username');
-                
-                loginTitle.innerText = `Masuk sebagai ${roleInfo.label}`;
-                usernameLabel.innerHTML = `${roleInfo.label === 'Siswa' ? 'NISN' : 'NIP'} <span class="text-sm text-white/70">(${roleInfo.label})</span>`;
-                usernameInput.placeholder = roleInfo.placeholder;
-                loginForm.classList.remove('hidden');
-                document.getElementById('login-message').classList.add('hidden');
-                usernameInput.focus();
-            }
-        }
-    }
-
-
-    function loadAppState() {
-        const savedState = localStorage.getItem('absensiAppState');
-        if (savedState) {
-            try {
-                const state = JSON.parse(savedState);
-                
-                // PERBAIKAN BUG REFRESH: Hapus pengecekan tanggal harian yang agresif.
-                // Sesi akan dipertahankan selama user belum logout.
-                if (state.user && state.role && state.tab) {
-                    currentUser = state.user;
-                    currentRole = state.role;
-                    initializeDashboard(state.tab);
-                    return true;
-                } else {
-                    localStorage.removeItem('absensiAppState');
-                }
-            } catch (e) {
-                console.error("Gagal memuat status aplikasi dari localStorage:", e);
-                localStorage.removeItem('absensiAppState');
-            }
-        }
-        return false;
-    }
-
-    function saveAppState() {
-        if (currentUser && currentUser.role && currentTab) {
-            localStorage.setItem('absensiAppState', JSON.stringify({
-                role: currentUser.role,
-                tab: currentTab,
-                lastLoginDate: new Date().toISOString().split('T')[0], // Simpan tanggal login (untuk referensi, tidak wajib untuk sesi)
-                user: {
-                    nisn: currentUser.nisn, nip: currentUser.nip, nama: currentUser.nama,
-                    kelas: currentUser.kelas, jurusan: currentUser.jurusan,
-                    kelasAjar: currentUser.kelasAjar, jurusanAjar: currentUser.jurusanAjar,
-                    email: currentUser.email
-                }
-            }));
-        } else {
-            localStorage.removeItem('absensiAppState');
-        }
-    }
-
-    function initializeDashboard(initialTab = null) {
-        showPage('dashboard-container');
-        document.getElementById('welcome-message').innerText = `Selamat Datang, ${currentUser.nama}!`;
-        renderDashboardTabs();
-        
-        let tabToOpen = initialTab;
-        if (!tabToOpen) {
-            if (currentUser.role === 'student') tabToOpen = 'absensi';
-            else if (currentUser.role === 'teacher') tabToOpen = 'rekap-guru';
-            else if (currentUser.role === 'admin') tabToOpen = 'rekap-admin';
-        }
-        selectTab(tabToOpen);
-    }
-
-    function logout() {
-        if (recapChartInstance) { recapChartInstance.destroy(); recapChartInstance = null; }
-        if (adminRecapChartInstance) { adminRecapChartInstance.destroy(); adminRecapChartInstance = null; }
-        if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; }
-        if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
-
-        allStudentsData = []; currentRecapData = []; currentTotalRecapData = [];
-        currentUser = null; currentRole = null; currentTab = '';
-        saveAppState(); // Removes state
-
-        showPage('entry-page');
-        document.getElementById('username').value = '';
-        document.getElementById('password').value = '';
-        document.getElementById('login-message').classList.add('hidden');
-        document.getElementById('login-form').classList.add('hidden');
-        document.getElementById('login-title').innerText = 'Pilih Peran Anda';
-
-        Object.keys(ROLE_MAP).forEach(key => {
-            const role = ROLE_MAP[key];
-            const btn = document.getElementById(`role-btn-${role.id}`);
-            btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg');
-            btn.classList.add('bg-gray-100', 'text-gray-600', 'hover:bg-indigo-50', 'hover:text-indigo-700');
-        });
-    }
-
-    function selectTab(tabId) {
-        currentTab = tabId;
-        saveAppState();
-
-        document.querySelectorAll('#dashboard-tabs button').forEach(btn => {
-            // NEW: Warna tab disesuaikan agar kontras elegan (transparan/putih)
-            btn.classList.remove('text-indigo-700', 'border-b-4', 'border-indigo-700', 'bg-indigo-50');
-            btn.classList.add('text-white/70', 'hover:text-white', 'hover:bg-white/10');
-        });
-
-        const selectedBtn = document.getElementById(`tab-${tabId}`);
-        if (selectedBtn) {
-            // NEW: Warna tab aktif
-            selectedBtn.classList.remove('text-white/70', 'hover:text-white', 'hover:bg-white/10');
-            selectedBtn.classList.add('text-white', 'border-b-4', 'border-white', 'bg-white/20');
-        }
-
-        renderTabContent(tabId);
-    }
-
 
     // ====================================================================
     // --- 7. HANDLER & LISTENER FUNCTIONS (Logic Interaktif) ---
@@ -3030,10 +2467,10 @@
         const chartTitleDemo = filterType === 'class' ? 'Jumlah Total Siswa per Kelas' : 'Jumlah Total Siswa per Jurusan';
         renderDemographicChart('comparison-chart', demographicData, chartTitleDemo);
         demoContainer.classList.remove('hidden');
+        document.getElementById('comparison-chart-title').textContent = chartTitleDemo;
 
         // 3. Render Attendance Percentage Chart
-        const chartTitleAttend = filterType === 'class' ? 'Persentase Kehadiran per Kelas' : 'Persentase Kehadiran per Jurusan';
-        renderAttendanceComparisonChart('comparison-attendance-chart', attendanceData, chartTitleAttend);
+        renderAttendanceComparisonChart('comparison-attendance-chart', attendanceData, filterType);
         attendContainer.classList.remove('hidden');
 
         messageDiv.classList.add('hidden');
@@ -3135,7 +2572,7 @@
              if (result && result.message && result.message.includes('Aksi tidak dikenali.')) {
                  messageDiv.innerHTML = `<p class="font-semibold text-red-500">Error Server: Fungsi "getStudentListWithStatus" tidak ditemukan. Harap pastikan Anda telah menyimpan dan **REDEPLOY** Apps Script terbaru.</p>`;
              } else {
-                 messageDiv.innerHTML = `<p class="font-semibold text-red-500">${result ? result.message : 'Gagal memuat data siswa (Error tidak terduga).'}</p>`;
+                messageDiv.innerHTML = `<p class="font-semibold text-red-500">${result ? result.message : 'Gagal memuat data siswa (Error tidak terduga).'}</p>`;
              }
              return;
         }
@@ -3318,6 +2755,7 @@
         if (result && result.status === 'success') {
             showModal('Penyimpanan Berhasil', 'Absensi massal berhasil diperbarui.', 'success', 3000);
             
+            // Refresh list after save
             const loadForm = document.getElementById('manual-attendance-form');
             if (loadForm) {
                  // FIX: Tambahkan delay 50ms untuk sinkronisasi data Apps Script
