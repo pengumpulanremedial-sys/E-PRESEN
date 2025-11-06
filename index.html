@@ -36,46 +36,17 @@
 
         /* CSS untuk menyembunyikan elemen non-cetak saat window.print() dipanggil (PERBAIKAN 1) */
         @media print {
-            /* Hapus background dan URL header browser saat cetak */
-            @page {
-                margin: 1cm; /* Atur margin minimal */
-            }
-            body {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            
             /* Sembunyikan elemen navigasi dan kontrol */
             header, nav, .flex.justify-end, .page:not(#dashboard-container), 
             h2, .bg-purple-50, .bg-indigo-50, #modal-message, #mini-popup, #dashboard-tabs, 
             .print-hidden, #recap-results > div:nth-child(1), #admin-recap-results > div:nth-child(1), 
-            #teacher-recap-form, #admin-recap-form, #total-recap-form, #total-recap-message,
-            /* Hapus Duplikasi Header/Footer Otomatis dari Browser */
-            [id$="-print-header"] + table {
-                margin-top: 0 !important;
-            } 
-            /* Tambahkan perbaikan CSS untuk baris data */
-             table {
-                font-size: 10pt;
-                width: 100% !important;
-                table-layout: auto !important; 
-                border-collapse: collapse; 
-            }
-            
-            td, th {
-                white-space: normal;
-                /* Kurangi padding untuk memaksimalkan ruang */
-                padding: 2px 4px; 
-                line-height: 1.3; /* Jarak baris lebih rapat */
-                word-wrap: break-word; 
-                overflow-wrap: break-word;
-                vertical-align: top; 
+            #teacher-recap-form, #admin-recap-form, #total-recap-form, #total-recap-message {
+                display: none !important;
             }
             
             /* Tampilkan header tabel di setiap halaman */
             thead {
                 display: table-header-group;
-                background-color: #e0e7ff !important; /* Pastikan warna header tabel tetap */
             }
             
             /* Atur ulang margin dan padding untuk cetak penuh */
@@ -83,8 +54,6 @@
                 margin: 0 !important;
                 padding: 0 !important;
                 min-height: auto !important;
-                /* Atur lebar total konten menjadi 100% */
-                width: 100% !important; 
             }
             
             /* Pastikan konten utama yang dicetak menempati seluruh lebar kertas */
@@ -110,11 +79,10 @@
             /* Tampilkan header cetak */
             .print-only {
                 display: block !important;
-                margin-bottom: 5px !important; /* Kurangi margin bawah header cetak */
-                padding: 0 5px !important;
+                margin-bottom: 20px !important;
+                padding: 0 !important;
                 border: none !important;
-                color: #000; 
-                width: 100%;
+                color: #000; /* Pastikan teks berwarna hitam */
             }
 
             /* --- SKEMA LEBAR KOLOM BARU YANG LEBIH DINAMIS --- */
@@ -123,13 +91,13 @@
             #admin-recap-results table th:nth-child(1) { width: 4%; } /* NO */
             
             #recap-results table th:nth-child(2), 
-            #admin-recap-results table th:nth-child(2) { width: 12%; } /* NISN */
+            #admin-recap-results table th:nth-child(2) { width: 14%; } /* NISN */
             
             #recap-results table th:nth-child(3), 
-            #admin-recap-results table th:nth-child(3) { width: 25%; } /* NAMA SISWA (Paling Lebar) */
+            #admin-recap-results table th:nth-child(3) { width: 28%; } /* NAMA SISWA (Paling Lebar) */
             
             #recap-results table th:nth-child(4), 
-            #admin-recap-results table th:nth-child(4) { width: 15%; } /* KELAS/JURUSAN */
+            #admin-recap-results table th:nth-child(4) { width: 16%; } /* KELAS/JURUSAN */
             
             #recap-results table th:nth-child(5), 
             #admin-recap-results table th:nth-child(5) { width: 16%; } /* TGL/WAKTU */
@@ -138,18 +106,17 @@
             #admin-recap-results table th:nth-child(6) { width: 8%; } /* STATUS */
             
             #recap-results table th:nth-child(7), 
-            #admin-recap-results table th:nth-child(7) { width: 20%; } /* KETERANGAN */
+            #admin-recap-results table th:nth-child(7) { width: 14%; } /* KETERANGAN */
 
             /* Skema untuk Rekap Total */
             #total-recap-results table th:nth-child(1) { width: 4%; } /* No */
             #total-recap-results table th:nth-child(2) { width: 12%; } /* NISN */
-            #total-recap-results table th:nth-child(3) { width: 30%; } /* Nama Siswa */
-            #total-recap-results table th:nth-child(4) { width: 14%; } /* Kelas/Jurusan */
-            /* Sisa 40% dibagi 4 untuk status */
-            #total-recap-results table th:nth-child(5) { width: 10%; } /* Hadir */
-            #total-recap-results table th:nth-child(6) { width: 10%; } /* Izin */
-            #total-recap-results table th:nth-child(7) { width: 10%; } /* Sakit */
-            #total-recap-results table th:nth-child(8) { width: 10%; } /* Alpha */
+            #total-recap-results table th:nth-child(3) { width: 25%; } /* Nama Siswa */
+            #total-recap-results table th:nth-child(4) { width: 13%; } /* Kelas/Jurusan */
+            #total-recap-results table th:nth-child(5) { width: 11%; } /* Hadir */
+            #total-recap-results table th:nth-child(6) { width: 11%; } /* Izin */
+            #total-recap-results table th:nth-child(7) { width: 11%; } /* Sakit */
+            #total-recap-results table th:nth-child(8) { width: 11%; } /* Alpha */
             
             /* --- END PERBAIKAN BUG OVERLAP CETAK --- */
         }
@@ -1989,7 +1956,7 @@
             <p id="admin-management-message" class="text-center text-gray-500 py-10">Memuat data siswa...</p>
             
             <form id="admin-student-update-form" class="hidden">
-                       <div class="flex flex-col space-y-3 md:flex-row justify-between items-center mb-4 print-hidden">
+                       <div class="flex flex-col space-y-3 md:flex-row justify-between items-center mb-4 md:space-y-0 print-hidden">
                         <button type="button" onclick="openAddStudentModal()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center">
                             <span data-lucide="user-plus" class="w-4 h-4 mr-2"></span> Tambah Siswa Baru
                         </button>
