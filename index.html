@@ -75,33 +75,43 @@
             table {
                 font-size: 10pt;
                 width: 100% !important;
-                /* Gunakan table-layout: fixed; untuk kontrol lebar kolom */
-                table-layout: fixed; 
+                /* Hapus table-layout: fixed, biarkan browser menentukan layoutnya */
+                table-layout: auto !important; 
+                border-collapse: collapse; /* Pastikan garis tidak terpisah */
             }
             
             td, th {
                 white-space: normal;
-                padding: 4px;
-                /* Tambahkan properti pemecah kata yang agresif */
+                padding: 4px 6px; /* Tambah padding agar ada jarak */
+                /* Pastikan pemecahan kata (word breaking) terjadi */
                 word-wrap: break-word; 
                 overflow-wrap: break-word;
+                vertical-align: top; /* Rata atas untuk teks multi-baris */
             }
             
-            /* Tentukan lebar proporsional untuk kolom agar tidak saling tumpang tindih */
+            /* --- SKEMA LEBAR KOLOM BARU YANG LEBIH DINAMIS --- */
+            /* Menggunakan width yang lebih kecil dari 100% agar ada ruang yang bisa diregangkan oleh browser */
+            
             #recap-results table th:nth-child(1), 
-            #admin-recap-results table th:nth-child(1) { width: 5%; } /* NO */
+            #admin-recap-results table th:nth-child(1) { width: 4%; } /* NO */
+            
             #recap-results table th:nth-child(2), 
-            #admin-recap-results table th:nth-child(2) { width: 15%; } /* NISN */
+            #admin-recap-results table th:nth-child(2) { width: 14%; } /* NISN */
+            
             #recap-results table th:nth-child(3), 
-            #admin-recap-results table th:nth-child(3) { width: 25%; } /* NAMA SISWA */
+            #admin-recap-results table th:nth-child(3) { width: 28%; } /* NAMA SISWA (Paling Lebar) */
+            
             #recap-results table th:nth-child(4), 
-            #admin-recap-results table th:nth-child(4) { width: 15%; } /* KELAS/JURUSAN */
+            #admin-recap-results table th:nth-child(4) { width: 16%; } /* KELAS/JURUSAN */
+            
             #recap-results table th:nth-child(5), 
-            #admin-recap-results table th:nth-child(5) { width: 15%; } /* TGL/WAKTU */
+            #admin-recap-results table th:nth-child(5) { width: 16%; } /* TGL/WAKTU */
+            
             #recap-results table th:nth-child(6), 
-            #admin-recap-results table th:nth-child(6) { width: 10%; } /* STATUS */
+            #admin-recap-results table th:nth-child(6) { width: 8%; } /* STATUS */
+            
             #recap-results table th:nth-child(7), 
-            #admin-recap-results table th:nth-child(7) { width: 15%; } /* KETERANGAN */
+            #admin-recap-results table th:nth-child(7) { width: 14%; } /* KETERANGAN */
 
             /* --- END PERBAIKAN BUG OVERLAP CETAK --- */
         }
