@@ -657,7 +657,7 @@
         const isHadir = (type === 'hadir');
         const label = isScore ? `Nilai ${value}` : (isHadir ? `Status 'Hadir'` : `Keterangan '${value}'`);
         
-        textEl.innerHTML = `<span data-lucide="zap" class="w-5 h-5 text-indigo-500"></span> <span>Terapkan ${label} ini ke semua baris yang kosong?</span>`;
+        textEl.innerHTML = `<span data-lucide="zap" class="w-5 h-5 text-indigo-500"></span> <span>Terapkan nilai/keterangan ini ke semua baris yang kosong?</span>`;
         applyBtn.classList.toggle('bg-indigo-600', !isScore);
         applyBtn.classList.toggle('hover:bg-indigo-700', !isScore);
         applyBtn.classList.toggle('bg-green-600', isScore);
@@ -741,7 +741,7 @@
             // Mengubah warna tombol agar kontras dengan latar belakang Glassmorphism
             const btn = document.getElementById(`role-btn-${role.id}`);
             btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg'); // Remove previous active style
-            btn.classList.add('bg-white/30', 'text-white', 'hover:bg-white/50', 'hover:text-white');
+            btn.classList.add('bg-white/20', 'text-white', 'hover:bg-white/50', 'hover:text-white');
         });
 
         if (typeof lucide !== 'undefined') {
@@ -858,711 +858,6 @@
 
 
     // ====================================================================
-    // --- 4. CORE LOGIC (LOGIN, NAVIGATION, STATE) ---
-    // ====================================================================
-    
-    function renderDashboardTabs() {
-        const tabsContainer = document.querySelector('#dashboard-tabs nav');
-        tabsContainer.innerHTML = '';
-
-        TABS[currentUser.role].forEach(tab => {
-            const button = document.createElement('button');
-            button.id = `tab-${tab.id}`;
-            // NEW: Warna tab disesuaikan agar kontras elegan
-            button.className = `flex items-center px-4 py-2 text-sm font-medium rounded-t-lg transition-colors duration-150 text-white/70 hover:text-white hover:bg-white/10`;
-            button.innerHTML = `<span data-lucide="${tab.icon}" class="w-4 h-4 mr-2"></span>${tab.label}`;
-            button.onclick = () => selectTab(tab.id);
-            tabsContainer.appendChild(button);
-        });
-
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
-    
-    async function renderTabContent(tabId) {
-        const contentDiv = document.getElementById('tab-content');
-        // NEW: Menggunakan warna loading yang kontras (putih/kuning)
-        contentDiv.innerHTML = `<div class="flex justify-center items-center py-10"><div class="animate-spin"><span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span></div><span class="ml-3 text-white">Memuat data...</span></div>`;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-        hideMiniPopup();
-
-        if (tabId === 'absensi') {
-            await Promise.all([checkStudentAttendanceStatus(), getStudentHistory()]);
-        }
-        
-        contentDiv.innerHTML = '';
-
-        if (recapChartInstance) { recapChartInstance.destroy(); recapChartInstance = null; }
-        if (adminRecapChartInstance) { adminRecapChartInstance.destroy(); adminRecapChartInstance = null; }
-        // FIX: Ensure both comparison chart instances are destroyed
-        if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; } 
-        if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
-
-        if (tabId !== 'rekap-guru' && tabId !== 'rekap-admin') {
-            currentRecapData = [];
-        }
-        
-        if (tabId !== 'rekap-total') {
-            currentTotalRecapData = []; // Clear total recap state on tab change
-        }
-
-        currentRecapFilters = {}; // Clear print filters on tab change
-
-
-        switch (tabId) {
-            case 'absensi':
-                contentDiv.innerHTML = renderStudentAttendanceForm();
-                contentDiv.insertAdjacentHTML('beforeend', renderStudentAttendanceHistory());
-                setupAttendanceFormListeners();
-                break;
-            case 'profil':
-                contentDiv.innerHTML = renderProfilePage();
-                break;
-            case 'rekap-guru':
-                contentDiv.innerHTML = renderTeacherRecap();
-                setupTeacherRecapListeners();
-                break;
-            // NEW CASE: Rekap Total Absen
-            case 'rekap-total':
-                contentDiv.innerHTML = renderTeacherTotalRecap();
-                setupTeacherTotalRecapListeners();
-                break;
-            case 'perbandingan':
-                contentDiv.innerHTML = renderTeacherComparison();
-                setupTeacherComparisonListeners(); 
-                break;
-            case 'absensi-siswa':
-                contentDiv.innerHTML = renderTeacherStudentAttendance();
-                setupTeacherStudentAttendanceListeners(); 
-                break;
-            case 'penilaian':
-                contentDiv.innerHTML = renderTeacherAssessment();
-                setupTeacherAssessmentListeners();
-                break;
-            case 'rekap-admin':
-                contentDiv.innerHTML = renderAdminGlobalRecap();
-                setupAdminRecapListeners();
-                break;
-            case 'konfigurasi':
-                contentDiv.innerHTML = renderAdminConfiguration();
-                setupAdminConfigurationListeners(); // NEW HANDLER
-                break;
-            case 'manajemen':
-                contentDiv.innerHTML = renderAdminManagement();
-                setupAdminManagementListeners();
-                break;
-            default:
-                contentDiv.innerHTML = `<p class="text-center text-gray-500 py-10">Pilih menu di atas.</p>`;
-        }
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
-
-
-    function selectRole(roleId) {
-        currentRole = roleId;
-
-        if (roleId) {
-            const roleInfo = Object.values(ROLE_MAP).find(r => r.id === roleId);
-
-            Object.keys(ROLE_MAP).forEach(key => {
-                const role = ROLE_MAP[key];
-                // NEW: Menggunakan warna transparan untuk tombol yang tidak aktif
-                const btn = document.getElementById(`role-btn-${role.id}`);
-                btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg');
-                btn.classList.add('bg-white/20', 'text-white', 'hover:bg-white/40');
-            });
-            const selectedBtn = document.getElementById(`role-btn-${roleId}`);
-            
-            if (selectedBtn) {
-                // NEW: Menggunakan gradien untuk tombol yang aktif
-                selectedBtn.classList.remove('bg-white/20', 'text-white', 'hover:bg-white/40');
-                selectedBtn.classList.add('bg-gradient-to-r', 'from-blue-500', 'to-indigo-600', 'text-white', 'shadow-lg', 'shadow-blue-500/50');
-
-                const loginForm = document.getElementById('login-form');
-                const loginTitle = document.getElementById('login-title');
-                const usernameLabel = document.getElementById('username-label');
-                const usernameInput = document.getElementById('username');
-                
-                loginTitle.innerText = `Masuk sebagai ${roleInfo.label}`;
-                usernameLabel.innerHTML = `${roleInfo.label === 'Siswa' ? 'NISN' : 'NIP'} <span class="text-sm text-white/70">(${roleInfo.label})</span>`;
-                usernameInput.placeholder = roleInfo.placeholder;
-                loginForm.classList.remove('hidden');
-                document.getElementById('login-message').classList.add('hidden');
-                usernameInput.focus();
-            }
-        }
-    }
-
-
-    function loadAppState() {
-        const savedState = localStorage.getItem('absensiAppState');
-        if (savedState) {
-            try {
-                const state = JSON.parse(savedState);
-                
-                // PERBAIKAN BUG REFRESH: Hapus pengecekan tanggal harian yang agresif.
-                // Sesi akan dipertahankan selama user belum logout.
-                if (state.user && state.role && state.tab) {
-                    currentUser = state.user;
-                    currentRole = state.role;
-                    initializeDashboard(state.tab);
-                    return true;
-                } else {
-                    localStorage.removeItem('absensiAppState');
-                }
-            } catch (e) {
-                console.error("Gagal memuat status aplikasi dari localStorage:", e);
-                localStorage.removeItem('absensiAppState');
-            }
-        }
-        return false;
-    }
-
-    function saveAppState() {
-        if (currentUser && currentUser.role && currentTab) {
-            localStorage.setItem('absensiAppState', JSON.stringify({
-                role: currentUser.role,
-                tab: currentTab,
-                lastLoginDate: new Date().toISOString().split('T')[0], // Simpan tanggal login (untuk referensi, tidak wajib untuk sesi)
-                user: {
-                    nisn: currentUser.nisn, nip: currentUser.nip, nama: currentUser.nama,
-                    kelas: currentUser.kelas, jurusan: currentUser.jurusan,
-                    kelasAjar: currentUser.kelasAjar, jurusanAjar: currentUser.jurusanAjar,
-                    email: currentUser.email
-                }
-            }));
-        } else {
-            localStorage.removeItem('absensiAppState');
-        }
-    }
-
-    function initializeDashboard(initialTab = null) {
-        showPage('dashboard-container');
-        document.getElementById('welcome-message').innerText = `Selamat Datang, ${currentUser.nama}!`;
-        renderDashboardTabs();
-        
-        let tabToOpen = initialTab;
-        if (!tabToOpen) {
-            if (currentUser.role === 'student') tabToOpen = 'absensi';
-            else if (currentUser.role === 'teacher') tabToOpen = 'rekap-guru';
-            else if (currentUser.role === 'admin') tabToOpen = 'rekap-admin';
-        }
-        selectTab(tabToOpen);
-    }
-
-    function logout() {
-        if (recapChartInstance) { recapChartInstance.destroy(); recapChartInstance = null; }
-        if (adminRecapChartInstance) { adminRecapChartInstance.destroy(); adminRecapChartInstance = null; }
-        if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; }
-        if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
-
-        allStudentsData = []; currentRecapData = []; currentTotalRecapData = [];
-        currentUser = null; currentRole = null; currentTab = '';
-        saveAppState(); // Removes state
-
-        showPage('entry-page');
-        document.getElementById('username').value = '';
-        document.getElementById('password').value = '';
-        document.getElementById('login-message').classList.add('hidden');
-        document.getElementById('login-form').classList.add('hidden');
-        document.getElementById('login-title').innerText = 'Pilih Peran Anda';
-
-        Object.keys(ROLE_MAP).forEach(key => {
-            const role = ROLE_MAP[key];
-            const btn = document.getElementById(`role-btn-${role.id}`);
-            btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg');
-            btn.classList.add('bg-gray-100', 'text-gray-600', 'hover:bg-indigo-50', 'hover:text-indigo-700');
-        });
-    }
-
-    function selectTab(tabId) {
-        currentTab = tabId;
-        saveAppState();
-
-        document.querySelectorAll('#dashboard-tabs button').forEach(btn => {
-            // NEW: Warna tab disesuaikan agar kontras elegan (transparan/putih)
-            btn.classList.remove('text-indigo-700', 'border-b-4', 'border-indigo-700', 'bg-indigo-50');
-            btn.classList.add('text-white/70', 'hover:text-white', 'hover:bg-white/10');
-        });
-
-        const selectedBtn = document.getElementById(`tab-${tabId}`);
-        if (selectedBtn) {
-            // NEW: Warna tab aktif
-            selectedBtn.classList.remove('text-white/70', 'hover:text-white', 'hover:bg-white/10');
-            selectedBtn.classList.add('text-white', 'border-b-4', 'border-white', 'bg-white/20');
-        }
-
-        renderTabContent(tabId);
-    }
-
-
-    // ====================================================================
-    // --- 5. CHARTING & RECAP FUNCTIONS ---
-    // ====================================================================
-
-    function renderRecapSummary(id, summary) {
-        const total = summary['Total'] || 0;
-        const totalTidakHadir = (summary['Izin'] || 0) + (summary['Sakit'] || 0) + (summary['Alpha'] || 0);
-
-        const cardData = [
-            // NEW: Mengubah skema warna kartu dan teks menjadi lebih elegan di atas latar gelap
-            { label: "Total Siswa", value: total, icon: "users", color: "text-blue-300", bg: "bg-white/10", iconColor: "text-blue-300" },
-            { label: "Total Hadir", value: summary['Hadir'] || 0, icon: "check-circle", color: "text-emerald-300", bg: "bg-white/10", iconColor: "text-emerald-300" },
-            { label: "Total Tidak Hadir", value: totalTidakHadir, icon: "x-circle", color: "text-red-300", bg: "bg-white/10", iconColor: "text-red-300" },
-            { label: "Izin/Sakit", value: (summary['Izin'] || 0) + (summary['Sakit'] || 0), icon: "user-x", color: "text-amber-300", bg: "bg-white/10", iconColor: "text-amber-300" },
-            { label: "Alpha", value: summary['Alpha'] || 0, icon: "skull", color: "text-gray-300", bg: "bg-white/10", iconColor: "text-gray-300" },
-        ];
-
-        const html = cardData.map(card => `
-            <div class="${card.bg} p-4 rounded-xl flex items-center justify-between transition duration-200 modern-hover shadow-lg">
-                <div>
-                    <p class="text-sm font-medium text-white/70">${card.label}</p>
-                    <p class="text-2xl font-bold ${card.color}">${card.value}</p>
-                </div>
-                <span data-lucide="${card.icon}" class="${card.iconColor} w-8 h-8 opacity-70"></span>
-            </div>
-        `).join('');
-
-        document.getElementById(id).innerHTML = html;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
-
-    function renderAttendanceChart(canvasId, summaryData, isTeacherRecap) {
-        // Mendapatkan konteks 2D untuk membuat gradien
-        const ctx = document.getElementById(canvasId).getContext('2d'); 
-        let currentInstance = (canvasId === 'recap-chart') ? recapChartInstance : adminRecapChartInstance;
-        if (currentInstance) currentInstance.destroy();
-
-        // --- NEW: Custom Neon Gradient Colors matching image theme ---
-        const createNeonGradient = (colorStart, colorEnd) => {
-            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-            gradient.addColorStop(0, colorStart);
-            gradient.addColorStop(1, colorEnd);
-            return gradient;
-        };
-
-        const gradientHadir = createNeonGradient('#10b981', '#059669'); // Green
-        const gradientIzin = createNeonGradient('#f59e0b', '#d97706'); // Amber
-        const gradientSakit = createNeonGradient('#ef4444', '#dc2626'); // Red
-        const gradientAlpha = createNeonGradient('#a78bfa', '#8b5cf6'); // Violet (Used instead of gray for better aesthetic on dark theme)
-        
-        // --- END Gradient Logic ---
-
-        const chartData = {
-            labels: ['Hadir', 'Izin', 'Sakit', 'Alpha'],
-            datasets: [{
-                label: 'Jumlah Siswa',
-                data: [
-                    summaryData['Hadir'] || 0, summaryData['Izin'] || 0,
-                    summaryData['Sakit'] || 0, summaryData['Alpha'] || 0
-                ],
-                backgroundColor: [gradientHadir, gradientIzin, gradientSakit, gradientAlpha],
-                // NEW: Menggunakan warna neon/terang untuk border
-                borderColor: ['#34d399', '#fcd34d', '#f87171', '#c4b5fd'], 
-                borderWidth: 3, 
-                borderRadius: 15, 
-                borderSkipped: false,
-                hoverBackgroundColor: ['#34d399', '#fcd34d', '#f87171', '#c4b5fd'],
-            }]
-        };
-
-        const newChart = new Chart(ctx.canvas, {
-            type: 'bar',
-            data: chartData,
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { 
-                    legend: { display: false }, 
-                    tooltip: { 
-                        callbacks: { label: (c) => `${c.label}: ${c.parsed.y} Siswa` },
-                        backgroundColor: 'rgba(30, 41, 59, 0.9)', // Dark background for tooltip
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        borderColor: '#7c3aed',
-                        borderWidth: 1,
-                        boxPadding: 8,
-                        usePointStyle: true,
-                        // NEW: Custom hover effect
-                        caretPadding: 10,
-                    } 
-                },
-                layout: {
-                    padding: { top: 10, bottom: 10 }
-                },
-                scales: {
-                    y: { 
-                        beginAtZero: true, 
-                        ticks: { 
-                            stepSize: 1, 
-                            callback: (v) => Number.isInteger(v) ? v : null, 
-                            font: { size: 13 },
-                            color: '#e5e7eb' // Light ticks color
-                        }, 
-                        grid: { 
-                            drawBorder: false, 
-                            color: 'rgba(255, 255, 255, 0.15)' // Subtle grid lines
-                        } 
-                    },
-                    x: { 
-                        grid: { display: false },
-                        ticks: { font: { size: 13, weight: 'bold' }, color: '#e5e7eb' } // Light ticks color
-                    }
-                }
-            },
-        });
-
-        if (canvasId === 'recap-chart') recapChartInstance = newChart;
-        else if (canvasId === 'admin-recap-chart') adminRecapChartInstance = newChart;
-    }
-
-    function renderDemographicChart(canvasId, data, chartTitle) {
-        const ctx = document.getElementById(canvasId).getContext('2d');
-
-        if (comparisonChartInstanceClass) comparisonChartInstanceClass.destroy();
-        comparisonChartInstanceClass = null;
-
-        // --- NEW: Gradient for Demographics (Neon Blue) ---
-        const gradientDemo = ctx.createLinearGradient(0, 0, 0, 400);
-        gradientDemo.addColorStop(0, '#38bdf8'); // Sky Blue
-        gradientDemo.addColorStop(1, '#1e40af'); // Dark Blue
-
-        const labels = data.map(d => d.label);
-        const values = data.map(d => d.value);
-
-        const chartData = {
-            labels: labels,
-            datasets: [{
-                label: 'Jumlah Total Siswa',
-                data: values,
-                backgroundColor: gradientDemo, // Use gradient
-                borderColor: '#38bdf8',
-                borderWidth: 3, 
-                borderRadius: 15, 
-                borderSkipped: false,
-            }]
-        };
-
-        const newChart = new Chart(ctx.canvas, {
-            type: 'bar',
-            data: chartData,
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { 
-                    legend: { display: false }, 
-                    title: { display: true, text: chartTitle, font: { size: 18, weight: 'bold', family: 'Inter' }, color: '#fff' }, // Light color for title
-                    tooltip: { 
-                        callbacks: { label: (c) => `Total Siswa: ${c.parsed.y}` },
-                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        borderColor: '#38bdf8',
-                        borderWidth: 1,
-                        boxPadding: 8,
-                    } 
-                },
-                scales: {
-                    y: { 
-                        beginAtZero: true, 
-                        title: { display: true, text: 'Jumlah Siswa', font: { size: 14 }, color: '#e5e7eb' },
-                        ticks: { stepSize: 1, callback: (v) => Number.isInteger(v) ? v : null, font: { size: 13 }, color: '#e5e7eb' }, 
-                        grid: { drawBorder: false, color: 'rgba(255, 255, 255, 0.15)' } 
-                    },
-                    x: { 
-                        title: { display: true, text: 'Kelas/Jurusan', font: { size: 14 }, color: '#e5e7eb' },
-                        grid: { display: false },
-                        ticks: { font: { size: 13, weight: 'bold' }, color: '#e5e7eb' }
-                    }
-                }
-            },
-        });
-
-        comparisonChartInstanceClass = newChart;
-    }
-    
-    // NEW: Render chart untuk Kehadiran (Perbaikan 1)
-    function renderAttendanceComparisonChart(canvasId, data, chartTitle) {
-        const ctx = document.getElementById(canvasId).getContext('2d');
-
-        // FIX: Ensure previous instance is destroyed
-        if (comparisonChartInstanceMajor) comparisonChartInstanceMajor.destroy();
-        comparisonChartInstanceMajor = null;
-
-        // --- NEW: Dynamic Neon Gradient Colors for Stacked Bars ---
-        const createNeonGradient = (colorStart, colorEnd) => {
-            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-            gradient.addColorStop(0, colorStart);
-            gradient.addColorStop(1, colorEnd);
-            return gradient;
-        };
-
-        const colors = {
-            // Using brighter colors for visibility on dark glassmorphism
-            'Hadir': { bg: createNeonGradient('#34d399', '#059669'), border: '#34d399' },
-            'Izin': { bg: createNeonGradient('#fcd34d', '#d97706'), border: '#fcd34d' },
-            'Sakit': { bg: createNeonGradient('#f87171', '#dc2626'), border: '#f87171' },
-            'Alpha': { bg: createNeonGradient('#a78bfa', '#8b5cf6'), border: '#a78bfa' } // Violet/Purple
-        };
-        // --- END Gradient Logic ---
-
-        const labels = Object.keys(data); // Nama Kelas/Jurusan
-        const statuses = ['Hadir', 'Izin', 'Sakit', 'Alpha'];
-
-        const datasets = statuses.map(status => ({
-            label: status,
-            data: labels.map(label => data[label][status] || 0),
-            backgroundColor: colors[status].bg,
-            borderColor: colors[status].border,
-            borderWidth: 1,
-            stack: 'Stack 0', // Untuk membuat stacked bar
-            borderRadius: 5, // Added rounding
-            borderSkipped: false,
-        }));
-
-        const newChart = new Chart(ctx.canvas, {
-            type: 'bar',
-            data: { labels: labels, datasets: datasets },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: {
-                    title: { display: true, text: chartTitle, font: { size: 18, weight: 'bold', family: 'Inter' }, color: '#fff' },
-                    legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 14 }, color: '#e5e7eb' } },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        borderColor: '#7c3aed',
-                        borderWidth: 1,
-                        boxPadding: 8,
-                        callbacks: {
-                            label: (context) => `${context.dataset.label}: ${context.parsed.y}%`,
-                            title: (context) => `${context[0].label} (Total: ${data[context[0].label].TotalRecords} records)`
-                        }
-                    }
-                },
-                scales: {
-                    x: { 
-                        stacked: true, 
-                        grid: { display: false },
-                        ticks: { font: { size: 13, weight: 'bold' }, color: '#e5e7eb' } 
-                    },
-                    y: { 
-                        stacked: true, 
-                        beginAtZero: true, 
-                        max: 100, 
-                        title: { display: true, text: 'Persentase Kehadiran (%)', font: { size: 14 }, color: '#e5e7eb' },
-                        grid: { color: 'rgba(255, 255, 255, 0.15)' }
-                    }
-                }
-            }
-        });
-
-        comparisonChartInstanceMajor = newChart;
-    }
-
-
-    async function displayRecap(kelas, jurusan, periode, resultsId, messageId, tableBodyId, canvasId, action) {
-        const resultsDiv = document.getElementById(resultsId);
-        const messageDiv = document.getElementById(messageId);
-        const tableBody = document.getElementById(tableBodyId);
-
-        resultsDiv.classList.add('hidden'); messageDiv.classList.remove('hidden');
-        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-yellow-300"></span></div><span class="ml-3 text-white">Mengambil data rekap...</span></div>`;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-        tableBody.innerHTML = '';
-        
-        document.getElementById(`${canvasId}-summary`).innerHTML = '';
-
-        const url = `${WEB_APP_URL}?action=${action}&kelas=${kelas}&jurusan=${jurusan}&periode=${periode}&role=${currentUser.role}&nip=${currentUser.nip || ''}`;
-        const result = await fetchData(url);
-        
-        // Simpan Filter untuk Keperluan Cetak/Export
-        currentRecapFilters = {
-            kelas: kelas,
-            jurusan: jurusan,
-            periode: periode,
-            isTotalRecap: false
-        };
-        
-        if (result && result.status === 'success') {
-            const filteredRecords = result.records;
-            currentRecapData = filteredRecords;
-
-
-            if (filteredRecords.length === 0) {
-                messageDiv.innerHTML = `<p class="font-semibold text-white/90">Tidak ada data absensi yang ditemukan untuk filter ini.</p>`;
-                const currentInstance = (canvasId === 'recap-chart') ? recapChartInstance : adminRecapChartInstance;
-                if (currentInstance) currentInstance.destroy();
-                return;
-            }
-
-            const summary = filteredRecords.reduce((acc, record) => {
-                acc[record.status] = (acc[record.status] || 0) + 1;
-                return acc;
-            }, { 'Hadir': 0, 'Izin': 0, 'Sakit': 0, 'Alpha': 0 });
-            
-            summary['Total'] = filteredRecords.length;
-            renderRecapSummary(`${canvasId}-summary`, summary);
-            renderAttendanceChart(canvasId, summary, resultsId === 'recap-results');
-
-            let html = '';
-            filteredRecords.forEach((r, index) => {
-                let statusColor = '';
-                // PERBAIKAN: Memberikan warna merah yang lebih jelas untuk Alpha
-                if (r.status === 'Hadir') statusColor = 'text-emerald-300 bg-emerald-700/30';
-                else if (r.status === 'Izin') statusColor = 'text-amber-300 bg-amber-700/30';
-                else if (r.status === 'Sakit') statusColor = 'text-red-300 bg-red-700/30';
-                else if (r.status === 'Alpha') statusColor = 'text-red-300 bg-red-700/50 font-bold'; // Merah lebih kuat dan Bold
-
-                const displayNama = r.nama || 'Nama Tidak Ditemukan (Cek Apps Script)'; 
-                const formattedTime = formatDateTime(r.date, r.time);
-
-
-                html += `
-                    <tr class="hover:bg-white/10">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-white/90">${index + 1}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/70">${r.nisn || '-'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/90">${displayNama}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/70">${r.kelas} / ${r.jurusan}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/70">${r.date} ${formattedTime}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColor}">${r.status}</span>
-                        </td>
-                        <td class="px-6 py-4 text-sm text-white/70 max-w-xs truncate">${r.keterangan || '-'}</td>
-                    </tr>
-                `;
-            });
-
-            tableBody.innerHTML = html;
-            messageDiv.classList.add('hidden');
-            resultsDiv.classList.remove('hidden');
-            
-            // Inject Print Header
-            const periodLabel = periode.charAt(0).toUpperCase() + periode.slice(1);
-            const printHeader = `
-                <div id="${resultsId}-print-header" class="mb-4 p-3 print-only">
-                    <h4 class="text-xl font-bold text-gray-800">Rekapitulasi Detail Absensi Siswa</h4>
-                    <p class="text-sm text-gray-600">
-                        Kelas: <span class="font-semibold">${kelas || 'Semua'}</span> | 
-                        Jurusan: <span class="font-semibold">${jurusan || 'Semua'}</span> | 
-                        Periode: <span class="font-semibold">${periodLabel}</span>
-                    </p>
-                    <p class="text-xs text-gray-500 mt-2">Dicetak pada: ${new Date().toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'})}</p>
-                </div>
-            `;
-            // Clear old header and insert new one
-            document.getElementById(resultsDiv.id).querySelectorAll('.print-only').forEach(el => el.remove());
-            resultsDiv.insertAdjacentHTML('afterbegin', printHeader);
-
-        } else {
-            messageDiv.innerHTML = `<p class="font-semibold text-red-400">${result ? result.message : 'Gagal memuat data rekap.'}</p>`;
-        }
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
-
-    // NEW FUNCTION: Display Total Recap
-    async function displayTotalRecap(kelas, jurusan, periode, startDate, endDate) {
-        const resultsDiv = document.getElementById('total-recap-results');
-        const messageDiv = document.getElementById('total-recap-message');
-        const tableBody = document.getElementById('total-recap-table-body');
-
-        resultsDiv.classList.add('hidden'); messageDiv.classList.remove('hidden');
-        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-yellow-300"></span></div><span class="ml-3 text-white">Menghitung rekap total...</span></div>`;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-        tableBody.innerHTML = '';
-        currentTotalRecapData = [];
-
-        // Determine Action and URL Params
-        let action = 'getTotalRecap'; // Assuming Apps Script has this function
-        let url = `${WEB_APP_URL}?action=${action}&kelas=${kelas}&jurusan=${jurusan}&periode=${periode}&startDate=${startDate || ''}&endDate=${endDate || ''}&role=${currentUser.role}&nip=${currentUser.nip || ''}`;
-
-        const result = await fetchData(url);
-        
-        // Simpan Filter untuk Keperluan Cetak/Export
-        currentRecapFilters = {
-            kelas: kelas,
-            jurusan: jurusan,
-            periode: periode,
-            startDate: startDate,
-            endDate: endDate,
-            isTotalRecap: true
-        };
-        
-        if (result && result.status === 'success' && result.summary) {
-            currentTotalRecapData = result.summary;
-
-            if (currentTotalRecapData.length === 0) {
-                messageDiv.innerHTML = `<p class="font-semibold text-white/90">Tidak ada data absensi yang ditemukan dalam periode yang dipilih.</p>`;
-                return;
-            }
-
-            let html = '';
-            currentTotalRecapData.forEach((r, index) => {
-                const displayNama = r.nama || 'Nama Tidak Ditemukan'; 
-                const hadirCount = r.Hadir || 0;
-                const izinCount = r.Izin || 0;
-                const sakitCount = r.Sakit || 0;
-                const alphaCount = r.Alpha || 0;
-
-                html += `
-                    <tr class="hover:bg-white/10">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-white/90">${index + 1}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/70">${r.nisn || '-'}</td>
-                        <td class="px-6 py-4 text-sm text-white/90 font-semibold">${displayNama}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/70">${r.kelas || '-'} / ${r.jurusan || '-'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-300">${hadirCount}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-amber-300">${izinCount}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-300">${sakitCount}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-300">${alphaCount}</td>
-                    </tr>
-                `;
-            });
-
-            tableBody.innerHTML = html;
-            messageDiv.classList.add('hidden');
-            resultsDiv.classList.remove('hidden');
-
-            // Inject Print Header
-            let periodText = '';
-            const periodeElement = document.getElementById('total-rekap-periode');
-            if (periode === 'custom' && startDate && endDate) {
-                // Formatting dates for display: YYYY-MM-DD to DD/MM/YYYY (approx)
-                const formattedStart = new Date(startDate).toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'});
-                const formattedEnd = new Date(endDate).toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'});
-                periodText = `Periode Khusus: ${formattedStart} s/d ${formattedEnd}`;
-            } else if (periode && periodeElement) {
-                const selectedOption = periodeElement.querySelector(`option[value="${periode}"]`);
-                const periodLabel = selectedOption ? selectedOption.textContent : periode.toUpperCase();
-                periodText = `Periode Cepat: ${periodLabel}`;
-            } else {
-                 periodText = 'Periode: Keseluruhan';
-            }
-
-            const printHeader = `
-                <div id="total-recap-results-print-header" class="mb-4 p-3 print-only">
-                    <h4 class="text-xl font-bold text-gray-800">Rekapitulasi Total Absensi Siswa</h4>
-                    <p class="text-sm text-gray-600">
-                        Kelas: <span class="font-semibold">${kelas || 'Semua'}</span> | 
-                        Jurusan: <span class="font-semibold">${jurusan || 'Semua'}</span> | 
-                        <span class="font-semibold">${periodText}</span>
-                    </p>
-                    <p class="text-xs text-gray-500 mt-2">Dicetak pada: ${new Date().toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'})}</p>
-                </div>
-            `;
-            
-            // Clear old header and insert new one
-            document.getElementById('total-recap-results').querySelectorAll('.print-only').forEach(el => el.remove());
-            resultsDiv.insertAdjacentHTML('afterbegin', printHeader);
-
-        } else {
-            const errorMsg = result ? result.message : 'Gagal memuat data rekap total. Pastikan fungsi Apps Script sudah di-redeploy.';
-            messageDiv.innerHTML = `<p class="font-semibold text-red-400">${errorMsg}</p>`;
-        }
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
-
-
-    // ====================================================================
     // --- 6. RENDERING FUNCTIONS (Membangun Struktur HTML) ---
     // ====================================================================
 
@@ -1649,11 +944,11 @@
 
             historyRecords.forEach(record => {
                 let statusClass = '';
-                // PERBAIKAN: Memberikan warna merah yang lebih jelas untuk Alpha
+                // PERBAIKAN: Warna Alpha menjadi merah menyala
                 if (record.status === 'Hadir') statusClass = 'text-emerald-300 bg-emerald-700/30';
                 else if (record.status === 'Izin') statusClass = 'text-amber-300 bg-amber-700/30';
                 else if (record.status === 'Sakit') statusClass = 'text-red-300 bg-red-700/30';
-                else if (record.status === 'Alpha') statusClass = 'text-red-300 bg-red-700/50 font-bold'; // Merah lebih kuat dan Bold
+                else if (record.status === 'Alpha') statusClass = 'text-rose-400 bg-rose-700/50 font-extrabold'; // Merah menyala dan Bold
                 
                 const formattedTime = formatDateTime(record.date, record.time);
 
@@ -1879,7 +1174,7 @@
                                 <th class="px-6 py-3 text-center text-xs font-bold text-emerald-300 uppercase tracking-wider">Hadir</th>
                                 <th class="px-6 py-3 text-center text-xs font-bold text-amber-300 uppercase tracking-wider">Izin</th>
                                 <th class="px-6 py-3 text-center text-xs font-bold text-red-300 uppercase tracking-wider">Sakit</th>
-                                <th class="px-6 py-3 text-center text-xs font-bold text-red-300 uppercase tracking-wider">Alpha</th>
+                                <th class="px-6 py-3 text-center text-xs font-bold text-rose-400 uppercase tracking-wider">Alpha</th>
                             </tr>
                         </thead>
                         <tbody id="total-recap-table-body" class="bg-white/10 divide-y divide-white/20">
@@ -2225,6 +1520,1306 @@
     }
 
     // ====================================================================
+    // --- 4. CORE LOGIC (LOGIN, NAVIGATION, STATE) ---
+    // ====================================================================
+    
+    function renderDashboardTabs() {
+        const tabsContainer = document.querySelector('#dashboard-tabs nav');
+        tabsContainer.innerHTML = '';
+
+        TABS[currentUser.role].forEach(tab => {
+            const button = document.createElement('button');
+            button.id = `tab-${tab.id}`;
+            // NEW: Warna tab disesuaikan agar kontras elegan
+            button.className = `flex items-center px-4 py-2 text-sm font-medium rounded-t-lg transition-colors duration-150 text-white/70 hover:text-white hover:bg-white/10`;
+            button.innerHTML = `<span data-lucide="${tab.icon}" class="w-4 h-4 mr-2"></span>${tab.label}`;
+            button.onclick = () => selectTab(tab.id);
+            tabsContainer.appendChild(button);
+        });
+
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+    
+    async function renderTabContent(tabId) {
+        const contentDiv = document.getElementById('tab-content');
+        // PERBAIKAN: Kontras dan Ukuran Loading Message
+        contentDiv.innerHTML = `<div class="flex flex-col justify-center items-center py-10">
+            <div class="animate-spin mb-4">
+                <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
+            </div>
+            <span class="text-white text-lg font-bold">Memuat data...</span>
+        </div>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        hideMiniPopup();
+
+        if (tabId === 'absensi') {
+            await Promise.all([checkStudentAttendanceStatus(), getStudentHistory()]);
+        }
+        
+        contentDiv.innerHTML = '';
+
+        if (recapChartInstance) { recapChartInstance.destroy(); recapChartInstance = null; }
+        if (adminRecapChartInstance) { adminRecapChartInstance.destroy(); adminRecapChartInstance = null; }
+        // FIX: Ensure both comparison chart instances are destroyed
+        if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; } 
+        if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
+
+        if (tabId !== 'rekap-guru' && tabId !== 'rekap-admin') {
+            currentRecapData = [];
+        }
+        
+        if (tabId !== 'rekap-total') {
+            currentTotalRecapData = []; // Clear total recap state on tab change
+        }
+
+        currentRecapFilters = {}; // Clear print filters on tab change
+
+
+        switch (tabId) {
+            case 'absensi':
+                contentDiv.innerHTML = renderStudentAttendanceForm();
+                contentDiv.insertAdjacentHTML('beforeend', renderStudentAttendanceHistory());
+                setupAttendanceFormListeners();
+                break;
+            case 'profil':
+                contentDiv.innerHTML = renderProfilePage();
+                break;
+            case 'rekap-guru':
+                contentDiv.innerHTML = renderTeacherRecap();
+                setupTeacherRecapListeners();
+                break;
+            // NEW CASE: Rekap Total Absen
+            case 'rekap-total':
+                contentDiv.innerHTML = renderTeacherTotalRecap();
+                setupTeacherTotalRecapListeners();
+                break;
+            case 'perbandingan':
+                contentDiv.innerHTML = renderTeacherComparison();
+                setupTeacherComparisonListeners(); 
+                break;
+            case 'absensi-siswa':
+                contentDiv.innerHTML = renderTeacherStudentAttendance();
+                setupTeacherStudentAttendanceListeners(); 
+                break;
+            case 'penilaian':
+                contentDiv.innerHTML = renderTeacherAssessment();
+                setupTeacherAssessmentListeners();
+                break;
+            case 'rekap-admin':
+                contentDiv.innerHTML = renderAdminGlobalRecap();
+                setupAdminRecapListeners();
+                break;
+            case 'konfigurasi':
+                contentDiv.innerHTML = renderAdminConfiguration();
+                setupAdminConfigurationListeners(); // NEW HANDLER
+                break;
+            case 'manajemen':
+                contentDiv.innerHTML = renderAdminManagement();
+                setupAdminManagementListeners();
+                break;
+            default:
+                contentDiv.innerHTML = `<p class="text-center text-gray-500 py-10">Pilih menu di atas.</p>`;
+        }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+
+    function selectRole(roleId) {
+        currentRole = roleId;
+
+        if (roleId) {
+            const roleInfo = Object.values(ROLE_MAP).find(r => r.id === roleId);
+
+            Object.keys(ROLE_MAP).forEach(key => {
+                const role = ROLE_MAP[key];
+                // NEW: Menggunakan warna transparan untuk tombol yang tidak aktif
+                const btn = document.getElementById(`role-btn-${role.id}`);
+                btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg');
+                btn.classList.add('bg-white/20', 'text-white', 'hover:bg-white/40');
+            });
+            const selectedBtn = document.getElementById(`role-btn-${roleId}`);
+            
+            if (selectedBtn) {
+                // NEW: Menggunakan gradien untuk tombol yang aktif
+                selectedBtn.classList.remove('bg-white/20', 'text-white', 'hover:bg-white/40');
+                selectedBtn.classList.add('bg-gradient-to-r', 'from-blue-500', 'to-indigo-600', 'text-white', 'shadow-lg', 'shadow-blue-500/50');
+
+                const loginForm = document.getElementById('login-form');
+                const loginTitle = document.getElementById('login-title');
+                const usernameLabel = document.getElementById('username-label');
+                const usernameInput = document.getElementById('username');
+                
+                loginTitle.innerText = `Masuk sebagai ${roleInfo.label}`;
+                usernameLabel.innerHTML = `${roleInfo.label === 'Siswa' ? 'NISN' : 'NIP'} <span class="text-sm text-white/70">(${roleInfo.label})</span>`;
+                usernameInput.placeholder = roleInfo.placeholder;
+                loginForm.classList.remove('hidden');
+                document.getElementById('login-message').classList.add('hidden');
+                usernameInput.focus();
+            }
+        }
+    }
+
+
+    function loadAppState() {
+        const savedState = localStorage.getItem('absensiAppState');
+        if (savedState) {
+            try {
+                const state = JSON.parse(savedState);
+                
+                // PERBAIKAN BUG REFRESH: Hapus pengecekan tanggal harian yang agresif.
+                // Sesi akan dipertahankan selama user belum logout.
+                if (state.user && state.role && state.tab) {
+                    currentUser = state.user;
+                    currentRole = state.role;
+                    initializeDashboard(state.tab);
+                    return true;
+                } else {
+                    localStorage.removeItem('absensiAppState');
+                }
+            } catch (e) {
+                console.error("Gagal memuat status aplikasi dari localStorage:", e);
+                localStorage.removeItem('absensiAppState');
+            }
+        }
+        return false;
+    }
+
+    function saveAppState() {
+        if (currentUser && currentUser.role && currentTab) {
+            localStorage.setItem('absensiAppState', JSON.stringify({
+                role: currentUser.role,
+                tab: currentTab,
+                lastLoginDate: new Date().toISOString().split('T')[0], // Simpan tanggal login (untuk referensi, tidak wajib untuk sesi)
+                user: {
+                    nisn: currentUser.nisn, nip: currentUser.nip, nama: currentUser.nama,
+                    kelas: currentUser.kelas, jurusan: currentUser.jurusan,
+                    kelasAjar: currentUser.kelasAjar, jurusanAjar: currentUser.jurusanAjar,
+                    email: currentUser.email
+                }
+            }));
+        } else {
+            localStorage.removeItem('absensiAppState');
+        }
+    }
+
+    function initializeDashboard(initialTab = null) {
+        showPage('dashboard-container');
+        document.getElementById('welcome-message').innerText = `Selamat Datang, ${currentUser.nama}!`;
+        renderDashboardTabs();
+        
+        let tabToOpen = initialTab;
+        if (!tabToOpen) {
+            if (currentUser.role === 'student') tabToOpen = 'absensi';
+            else if (currentUser.role === 'teacher') tabToOpen = 'rekap-guru';
+            else if (currentUser.role === 'admin') tabToOpen = 'rekap-admin';
+        }
+        selectTab(tabToOpen);
+    }
+
+    function logout() {
+        if (recapChartInstance) { recapChartInstance.destroy(); recapChartInstance = null; }
+        if (adminRecapChartInstance) { adminRecapChartInstance.destroy(); adminRecapChartInstance = null; }
+        if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; }
+        if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
+
+        allStudentsData = []; currentRecapData = []; currentTotalRecapData = [];
+        currentUser = null; currentRole = null; currentTab = '';
+        saveAppState(); // Removes state
+
+        showPage('entry-page');
+        document.getElementById('username').value = '';
+        document.getElementById('password').value = '';
+        document.getElementById('login-message').classList.add('hidden');
+        document.getElementById('login-form').classList.add('hidden');
+        document.getElementById('login-title').innerText = 'Pilih Peran Anda';
+
+        Object.keys(ROLE_MAP).forEach(key => {
+            const role = ROLE_MAP[key];
+            const btn = document.getElementById(`role-btn-${role.id}`);
+            btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg');
+            btn.classList.add('bg-gray-100', 'text-gray-600', 'hover:bg-indigo-50', 'hover:text-indigo-700');
+        });
+    }
+
+    function selectTab(tabId) {
+        currentTab = tabId;
+        saveAppState();
+
+        document.querySelectorAll('#dashboard-tabs button').forEach(btn => {
+            // NEW: Warna tab disesuaikan agar kontras elegan (transparan/putih)
+            btn.classList.remove('text-indigo-700', 'border-b-4', 'border-indigo-700', 'bg-indigo-50');
+            btn.classList.add('text-white/70', 'hover:text-white', 'hover:bg-white/10');
+        });
+
+        const selectedBtn = document.getElementById(`tab-${tabId}`);
+        if (selectedBtn) {
+            // NEW: Warna tab aktif
+            selectedBtn.classList.remove('text-white/70', 'hover:text-white', 'hover:bg-white/10');
+            selectedBtn.classList.add('text-white', 'border-b-4', 'border-white', 'bg-white/20');
+        }
+
+        renderTabContent(tabId);
+    }
+
+
+    // ====================================================================
+    // --- 5. CHARTING & RECAP FUNCTIONS ---
+    // ====================================================================
+
+    function renderRecapSummary(id, summary) {
+        const total = summary['Total'] || 0;
+        const totalTidakHadir = (summary['Izin'] || 0) + (summary['Sakit'] || 0) + (summary['Alpha'] || 0);
+
+        const cardData = [
+            // NEW: Mengubah skema warna kartu dan teks menjadi lebih elegan di atas latar gelap
+            { label: "Total Siswa", value: total, icon: "users", color: "text-blue-300", bg: "bg-white/10", iconColor: "text-blue-300" },
+            { label: "Total Hadir", value: summary['Hadir'] || 0, icon: "check-circle", color: "text-emerald-300", bg: "bg-white/10", iconColor: "text-emerald-300" },
+            { label: "Total Tidak Hadir", value: totalTidakHadir, icon: "x-circle", color: "text-red-300", bg: "bg-white/10", iconColor: "text-red-300" },
+            { label: "Izin/Sakit", value: (summary['Izin'] || 0) + (summary['Sakit'] || 0), icon: "user-x", color: "text-amber-300", bg: "bg-white/10", iconColor: "text-amber-300" },
+            // PERBAIKAN: Warna Alpha menjadi merah menyala
+            { label: "Alpha", value: summary['Alpha'] || 0, icon: "skull", color: "text-rose-400 font-extrabold", bg: "bg-white/10", iconColor: "text-rose-400" }, 
+        ];
+
+        const html = cardData.map(card => `
+            <div class="${card.bg} p-4 rounded-xl flex items-center justify-between transition duration-200 modern-hover shadow-lg">
+                <div>
+                    <p class="text-sm font-medium text-white/70">${card.label}</p>
+                    <p class="text-2xl font-bold ${card.color}">${card.value}</p>
+                </div>
+                <span data-lucide="${card.icon}" class="${card.iconColor} w-8 h-8 opacity-70"></span>
+            </div>
+        `).join('');
+
+        document.getElementById(id).innerHTML = html;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function renderAttendanceChart(canvasId, summaryData, isTeacherRecap) {
+        // Mendapatkan konteks 2D untuk membuat gradien
+        const ctx = document.getElementById(canvasId).getContext('2d'); 
+        let currentInstance = (canvasId === 'recap-chart') ? recapChartInstance : adminRecapChartInstance;
+        if (currentInstance) currentInstance.destroy();
+
+        // --- NEW: Custom Neon Gradient Colors matching image theme ---
+        const createNeonGradient = (colorStart, colorEnd) => {
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, colorStart);
+            gradient.addColorStop(1, colorEnd);
+            return gradient;
+        };
+
+        const gradientHadir = createNeonGradient('#10b981', '#059669'); // Green
+        const gradientIzin = createNeonGradient('#f59e0b', '#d97706'); // Amber
+        const gradientSakit = createNeonGradient('#ef4444', '#dc2626'); // Red
+        const gradientAlpha = createNeonGradient('#f43f5e', '#be123c'); // PERBAIKAN: Merah Rose (Neon Red/Scarlet)
+        
+        // --- END Gradient Logic ---
+
+        const chartData = {
+            labels: ['Hadir', 'Izin', 'Sakit', 'Alpha'],
+            datasets: [{
+                label: 'Jumlah Siswa',
+                data: [
+                    summaryData['Hadir'] || 0, summaryData['Izin'] || 0,
+                    summaryData['Sakit'] || 0, summaryData['Alpha'] || 0
+                ],
+                backgroundColor: [gradientHadir, gradientIzin, gradientSakit, gradientAlpha],
+                // NEW: Menggunakan warna neon/terang untuk border
+                borderColor: ['#34d399', '#fcd34d', '#f87171', '#f43f5e'], // Boundary ke Merah Rose
+                borderWidth: 3, 
+                borderRadius: 15, 
+                borderSkipped: false,
+                hoverBackgroundColor: ['#34d399', '#fcd34d', '#f87171', '#f43f5e'],
+            }]
+        };
+
+        const newChart = new Chart(ctx.canvas, {
+            type: 'bar',
+            data: chartData,
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { 
+                    legend: { display: false }, 
+                    tooltip: { 
+                        callbacks: { label: (c) => `${c.label}: ${c.parsed.y} Siswa` },
+                        backgroundColor: 'rgba(30, 41, 59, 0.9)', // Dark background for tooltip
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: '#7c3aed',
+                        borderWidth: 1,
+                        boxPadding: 8,
+                        usePointStyle: true,
+                        // NEW: Custom hover effect
+                        caretPadding: 10,
+                    } 
+                },
+                layout: {
+                    padding: { top: 10, bottom: 10 }
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true, 
+                        ticks: { 
+                            stepSize: 1, 
+                            callback: (v) => Number.isInteger(v) ? v : null, 
+                            font: { size: 13 },
+                            color: '#e5e7eb' // Light ticks color
+                        }, 
+                        grid: { 
+                            drawBorder: false, 
+                            color: 'rgba(255, 255, 255, 0.15)' // Subtle grid lines
+                        } 
+                    },
+                    x: { 
+                        grid: { display: false },
+                        ticks: { font: { size: 13, weight: 'bold' }, color: '#e5e7eb' } // Light ticks color
+                    }
+                }
+            },
+        });
+
+        if (canvasId === 'recap-chart') recapChartInstance = newChart;
+        else if (canvasId === 'admin-recap-chart') adminRecapChartInstance = newChart;
+    }
+
+    function renderDemographicChart(canvasId, data, chartTitle) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+
+        if (comparisonChartInstanceClass) comparisonChartInstanceClass.destroy();
+        comparisonChartInstanceClass = null;
+
+        // --- NEW: Gradient for Demographics (Neon Blue) ---
+        const gradientDemo = ctx.createLinearGradient(0, 0, 0, 400);
+        gradientDemo.addColorStop(0, '#38bdf8'); // Sky Blue
+        gradientDemo.addColorStop(1, '#1e40af'); // Dark Blue
+
+        const labels = data.map(d => d.label);
+        const values = data.map(d => d.value);
+
+        const chartData = {
+            labels: labels,
+            datasets: [{
+                label: 'Jumlah Total Siswa',
+                data: values,
+                backgroundColor: gradientDemo, // Use gradient
+                borderColor: '#38bdf8',
+                borderWidth: 3, 
+                borderRadius: 15, 
+                borderSkipped: false,
+            }]
+        };
+
+        const newChart = new Chart(ctx.canvas, {
+            type: 'bar',
+            data: chartData,
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { 
+                    legend: { display: false }, 
+                    title: { display: true, text: chartTitle, font: { size: 18, weight: 'bold', family: 'Inter' }, color: '#fff' }, // Light color for title
+                    tooltip: { 
+                        callbacks: { label: (c) => `Total Siswa: ${c.parsed.y}` },
+                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: '#38bdf8',
+                        borderWidth: 1,
+                        boxPadding: 8,
+                    } 
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true, 
+                        title: { display: true, text: 'Jumlah Siswa', font: { size: 14 }, color: '#e5e7eb' },
+                        ticks: { stepSize: 1, callback: (v) => Number.isInteger(v) ? v : null, font: { size: 13 }, color: '#e5e7eb' }, 
+                        grid: { drawBorder: false, color: 'rgba(255, 255, 255, 0.15)' } 
+                    },
+                    x: { 
+                        title: { display: true, text: 'Kelas/Jurusan', font: { size: 14 }, color: '#e5e7eb' },
+                        grid: { display: false },
+                        ticks: { font: { size: 13, weight: 'bold' }, color: '#e5e7eb' }
+                    }
+                }
+            },
+        });
+
+        comparisonChartInstanceClass = newChart;
+    }
+    
+    // NEW: Render chart untuk Kehadiran (Perbaikan 1)
+    function renderAttendanceComparisonChart(canvasId, data, chartTitle) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+
+        // FIX: Ensure previous instance is destroyed
+        if (comparisonChartInstanceMajor) comparisonChartInstanceMajor.destroy();
+        comparisonChartInstanceMajor = null;
+
+        // --- NEW: Dynamic Neon Gradient Colors for Stacked Bars ---
+        const createNeonGradient = (colorStart, colorEnd) => {
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, colorStart);
+            gradient.addColorStop(1, colorEnd);
+            return gradient;
+        };
+
+        const colors = {
+            // Using brighter colors for visibility on dark glassmorphism
+            'Hadir': { bg: createNeonGradient('#34d399', '#059669'), border: '#34d399' },
+            'Izin': { bg: createNeonGradient('#fcd34d', '#d97706'), border: '#fcd34d' },
+            'Sakit': { bg: createNeonGradient('#f87171', '#dc2626'), border: '#f87171' },
+            'Alpha': { bg: createNeonGradient('#f43f5e', '#be123c'), border: '#f43f5e' } // PERBAIKAN: Merah Rose (Neon Red/Scarlet)
+        };
+        // --- END Gradient Logic ---
+
+        const labels = Object.keys(data); // Nama Kelas/Jurusan
+        const statuses = ['Hadir', 'Izin', 'Sakit', 'Alpha'];
+
+        const datasets = statuses.map(status => ({
+            label: status,
+            data: labels.map(label => data[label][status] || 0),
+            backgroundColor: colors[status].bg,
+            borderColor: colors[status].border,
+            borderWidth: 1,
+            stack: 'Stack 0', // Untuk membuat stacked bar
+            borderRadius: 5, // Added rounding
+            borderSkipped: false,
+        }));
+
+        const newChart = new Chart(ctx.canvas, {
+            type: 'bar',
+            data: { labels: labels, datasets: datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: chartTitle, font: { size: 18, weight: 'bold', family: 'Inter' }, color: '#fff' },
+                    legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 14 }, color: '#e5e7eb' } },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: '#7c3aed',
+                        borderWidth: 1,
+                        boxPadding: 8,
+                        callbacks: {
+                            label: (context) => `${context.dataset.label}: ${context.parsed.y}%`,
+                            title: (context) => `${context[0].label} (Total: ${data[context[0].label].TotalRecords} records)`
+                        }
+                    }
+                },
+                scales: {
+                    x: { 
+                        stacked: true, 
+                        grid: { display: false },
+                        ticks: { font: { size: 13, weight: 'bold' }, color: '#e5e7eb' } 
+                    },
+                    y: { 
+                        stacked: true, 
+                        beginAtZero: true, 
+                        max: 100, 
+                        title: { display: true, text: 'Persentase Kehadiran (%)', font: { size: 14 }, color: '#e5e7eb' },
+                        grid: { color: 'rgba(255, 255, 255, 0.15)' }
+                    }
+                }
+            }
+        });
+
+        comparisonChartInstanceMajor = newChart;
+    }
+
+
+    async function displayRecap(kelas, jurusan, periode, resultsId, messageId, tableBodyId, canvasId, action) {
+        const resultsDiv = document.getElementById(resultsId);
+        const messageDiv = document.getElementById(messageId);
+        const tableBody = document.getElementById(tableBodyId);
+
+        resultsDiv.classList.add('hidden'); messageDiv.classList.remove('hidden');
+        // PERBAIKAN: Kontras dan Ukuran Loading Message
+        messageDiv.innerHTML = `<div class="flex flex-col justify-center items-center py-5">
+            <div class="animate-spin mb-4">
+                <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
+            </div>
+            <span class="text-white text-lg font-bold">Mengambil data rekap...</span>
+        </div>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        tableBody.innerHTML = '';
+        
+        document.getElementById(`${canvasId}-summary`).innerHTML = '';
+
+        const url = `${WEB_APP_URL}?action=${action}&kelas=${kelas}&jurusan=${jurusan}&periode=${periode}&role=${currentUser.role}&nip=${currentUser.nip || ''}`;
+        const result = await fetchData(url);
+        
+        // Simpan Filter untuk Keperluan Cetak/Export
+        currentRecapFilters = {
+            kelas: kelas,
+            jurusan: jurusan,
+            periode: periode,
+            isTotalRecap: false
+        };
+        
+        if (result && result.status === 'success') {
+            const filteredRecords = result.records;
+            currentRecapData = filteredRecords;
+
+
+            if (filteredRecords.length === 0) {
+                messageDiv.innerHTML = `<p class="font-semibold text-white/90">Tidak ada data absensi yang ditemukan untuk filter ini.</p>`;
+                const currentInstance = (canvasId === 'recap-chart') ? recapChartInstance : adminRecapChartInstance;
+                if (currentInstance) currentInstance.destroy();
+                return;
+            }
+
+            const summary = filteredRecords.reduce((acc, record) => {
+                acc[record.status] = (acc[record.status] || 0) + 1;
+                return acc;
+            }, { 'Hadir': 0, 'Izin': 0, 'Sakit': 0, 'Alpha': 0 });
+            
+            summary['Total'] = filteredRecords.length;
+            renderRecapSummary(`${canvasId}-summary`, summary);
+            renderAttendanceChart(canvasId, summary, resultsId === 'recap-results');
+
+            let html = '';
+            filteredRecords.forEach((r, index) => {
+                let statusColor = '';
+                // PERBAIKAN: Warna Alpha menjadi merah menyala
+                if (r.status === 'Hadir') statusColor = 'text-emerald-300 bg-emerald-700/30';
+                else if (r.status === 'Izin') statusColor = 'text-amber-300 bg-amber-700/30';
+                else if (r.status === 'Sakit') statusColor = 'text-red-300 bg-red-700/30';
+                else if (r.status === 'Alpha') statusColor = 'text-rose-400 bg-rose-700/50 font-extrabold'; // Merah menyala dan Bold
+
+                const displayNama = r.nama || 'Nama Tidak Ditemukan (Cek Apps Script)'; 
+                const formattedTime = formatDateTime(r.date, r.time);
+
+
+                html += `
+                    <tr class="hover:bg-white/10">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-white/90">${index + 1}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/70">${r.nisn || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/90">${displayNama}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/70">${r.kelas} / ${r.jurusan}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/70">${r.date} ${formattedTime}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColor}">${r.status}</span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-white/70 max-w-xs truncate">${r.keterangan || '-'}</td>
+                    </tr>
+                `;
+            });
+
+            tableBody.innerHTML = html;
+            messageDiv.classList.add('hidden');
+            resultsDiv.classList.remove('hidden');
+            
+            // Inject Print Header
+            const periodLabel = periode.charAt(0).toUpperCase() + periode.slice(1);
+            const printHeader = `
+                <div id="${resultsId}-print-header" class="mb-4 p-3 print-only">
+                    <h4 class="text-xl font-bold text-gray-800">Rekapitulasi Detail Absensi Siswa</h4>
+                    <p class="text-sm text-gray-600">
+                        Kelas: <span class="font-semibold">${kelas || 'Semua'}</span> | 
+                        Jurusan: <span class="font-semibold">${jurusan || 'Semua'}</span> | 
+                        Periode: <span class="font-semibold">${periodLabel}</span>
+                    </p>
+                    <p class="text-xs text-gray-500 mt-2">Dicetak pada: ${new Date().toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'})}</p>
+                </div>
+            `;
+            // Clear old header and insert new one
+            document.getElementById(resultsDiv.id).querySelectorAll('.print-only').forEach(el => el.remove());
+            resultsDiv.insertAdjacentHTML('afterbegin', printHeader);
+
+        } else {
+            messageDiv.innerHTML = `<p class="font-semibold text-red-400">${result ? result.message : 'Gagal memuat data rekap.'}</p>`;
+        }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    // NEW FUNCTION: Display Total Recap
+    async function displayTotalRecap(kelas, jurusan, periode, startDate, endDate) {
+        const resultsDiv = document.getElementById('total-recap-results');
+        const messageDiv = document.getElementById('total-recap-message');
+        const tableBody = document.getElementById('total-recap-table-body');
+
+        resultsDiv.classList.add('hidden'); messageDiv.classList.remove('hidden');
+        // PERBAIKAN: Kontras dan Ukuran Loading Message
+        messageDiv.innerHTML = `<div class="flex flex-col justify-center items-center py-5">
+            <div class="animate-spin mb-4">
+                <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
+            </div>
+            <span class="text-white text-lg font-bold">Menghitung rekap total...</span>
+        </div>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        tableBody.innerHTML = '';
+        currentTotalRecapData = [];
+
+        // Determine Action and URL Params
+        let action = 'getTotalRecap'; // Assuming Apps Script has this function
+        let url = `${WEB_APP_URL}?action=${action}&kelas=${kelas}&jurusan=${jurusan}&periode=${periode}&startDate=${startDate || ''}&endDate=${endDate || ''}&role=${currentUser.role}&nip=${currentUser.nip || ''}`;
+
+        const result = await fetchData(url);
+        
+        // Simpan Filter untuk Keperluan Cetak/Export
+        currentRecapFilters = {
+            kelas: kelas,
+            jurusan: jurusan,
+            periode: periode,
+            startDate: startDate,
+            endDate: endDate,
+            isTotalRecap: true
+        };
+        
+        if (result && result.status === 'success' && result.summary) {
+            currentTotalRecapData = result.summary;
+
+            if (currentTotalRecapData.length === 0) {
+                messageDiv.innerHTML = `<p class="font-semibold text-white/90">Tidak ada data absensi yang ditemukan dalam periode yang dipilih.</p>`;
+                return;
+            }
+
+            let html = '';
+            currentTotalRecapData.forEach((r, index) => {
+                const displayNama = r.nama || 'Nama Tidak Ditemukan'; 
+                const hadirCount = r.Hadir || 0;
+                const izinCount = r.Izin || 0;
+                const sakitCount = r.Sakit || 0;
+                const alphaCount = r.Alpha || 0;
+                
+                // PERBAIKAN: Warna data Alpha menjadi merah menyala
+                const alphaColorClass = alphaCount > 0 ? 'text-rose-400 font-extrabold' : 'text-red-300';
+
+                html += `
+                    <tr class="hover:bg-white/10">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-white/90">${index + 1}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/70">${r.nisn || '-'}</td>
+                        <td class="px-6 py-4 text-sm text-white/90 font-semibold">${displayNama}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/70">${r.kelas || '-'} / ${r.jurusan || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-300">${hadirCount}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-amber-300">${izinCount}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-300">${sakitCount}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold ${alphaColorClass}">${alphaCount}</td>
+                    </tr>
+                `;
+            });
+
+            tableBody.innerHTML = html;
+            messageDiv.classList.add('hidden');
+            resultsDiv.classList.remove('hidden');
+
+            // Inject Print Header
+            let periodText = '';
+            const periodeElement = document.getElementById('total-rekap-periode');
+            if (periode === 'custom' && startDate && endDate) {
+                // Formatting dates for display: YYYY-MM-DD to DD/MM/YYYY (approx)
+                const formattedStart = new Date(startDate).toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'});
+                const formattedEnd = new Date(endDate).toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'});
+                periodText = `Periode Khusus: ${formattedStart} s/d ${formattedEnd}`;
+            } else if (periode && periodeElement) {
+                const selectedOption = periodeElement.querySelector(`option[value="${periode}"]`);
+                const periodLabel = selectedOption ? selectedOption.textContent : periode.toUpperCase();
+                periodText = `Periode Cepat: ${periodLabel}`;
+            } else {
+                 periodText = 'Periode: Keseluruhan';
+            }
+
+            const printHeader = `
+                <div id="total-recap-results-print-header" class="mb-4 p-3 print-only">
+                    <h4 class="text-xl font-bold text-gray-800">Rekapitulasi Total Absensi Siswa</h4>
+                    <p class="text-sm text-gray-600">
+                        Kelas: <span class="font-semibold">${kelas || 'Semua'}</span> | 
+                        Jurusan: <span class="font-semibold">${jurusan || 'Semua'}</span> | 
+                        <span class="font-semibold">${periodText}</span>
+                    </p>
+                    <p class="text-xs text-gray-500 mt-2">Dicetak pada: ${new Date().toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'})}</p>
+                </div>
+            `;
+            
+            // Clear old header and insert new one
+            document.getElementById('total-recap-results').querySelectorAll('.print-only').forEach(el => el.remove());
+            resultsDiv.insertAdjacentHTML('afterbegin', printHeader);
+
+        } else {
+            const errorMsg = result ? result.message : 'Gagal memuat data rekap total. Pastikan fungsi Apps Script sudah di-redeploy.';
+            messageDiv.innerHTML = `<p class="font-semibold text-red-400">${errorMsg}</p>`;
+        }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function renderTeacherComparison() {
+        if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; }
+        if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
+
+        return `
+            <h3 class="text-2xl font-bold text-white mb-6">Perbandingan Demografi dan Kehadiran Kelas & Jurusan</h3>
+            <p class="text-white/90 mb-6">Pilih kriteria perbandingan yang ingin Anda lihat.</p>
+            <div class="glass-element p-5 rounded-lg shadow-inner mb-8 print-hidden">
+                <form id="comparison-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div class="col-span-2">
+                        <label for="comparison-filter" class="block text-sm font-medium text-white/90">Jenis Kriteria Perbandingan</label>
+                        <select id="comparison-filter" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
+                            <option value="class" class="bg-indigo-700">Per Kelas</option>
+                            <option value="major" class="bg-indigo-700">Per Jurusan</option>
+                        </select>
+                    </div>
+                    <div class="col-span-2">
+                        <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
+                            <span data-lucide="eye" class="w-4 h-4 mr-2"></span> Tampilkan Perbandingan
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="comparison-results" class="space-y-10">
+                <div id="comparison-message" class="text-center text-white/70 py-10">Pilih jenis perbandingan untuk menampilkan grafik.</div>
+
+                <!-- Chart 1: Demografi (Jumlah Siswa Total) -->
+                <div id="comparison-chart-container" class="hidden p-6 glass-container rounded-xl modern-shadow border-white/30">
+                    <h4 id="comparison-chart-title" class="text-xl font-bold text-white mb-4 flex items-center"><span data-lucide="bar-chart-2" class="w-5 h-5 mr-2 text-blue-300"></span> Grafik Demografi Siswa</h4>
+                    <div class="chart-container relative h-96 md:h-[500px]">
+                        <canvas id="comparison-chart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- NEW Chart 2: Persentase Kehadiran (Perbaikan 1) -->
+                    <div id="comparison-attendance-chart-container" class="hidden p-6 glass-container rounded-xl modern-shadow border-white/30">
+                        <h4 id="comparison-attendance-chart-title" class="text-xl font-bold text-emerald-300 mb-4 flex items-center"><span data-lucide="pie-chart" class="w-5 h-5 mr-2"></span> Grafik Persentase Kehadiran</h4>
+                        <div class="chart-container relative h-96 md:h-[500px]">
+                            <canvas id="comparison-attendance-chart"></canvas>
+                        </div>
+                    </div>
+
+            </div>
+        `;
+    }
+
+    function renderTeacherStudentAttendance() {
+        const currentDate = new Date().toISOString().split('T')[0];
+
+        return `
+            <h3 class="text-2xl font-bold text-white mb-6">Input / Edit Absensi Siswa (Manual)</h3>
+            <div class="glass-element p-5 rounded-lg shadow-inner mb-6 print-hidden">
+                <form id="manual-attendance-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div>
+                        <label for="manual-kelas" class="block text-sm font-medium text-white/90">Kelas</label>
+                        <select id="manual-kelas" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
+                            <option value="" class="bg-indigo-700">-- Pilih Kelas --</option>
+                            ${currentUser.kelasAjar ? currentUser.kelasAjar.map(c => `<option value="${c}" class="bg-indigo-700">${c}</option>`).join('') : `<option value="" class="bg-indigo-700">(Data Kelas tidak tersedia)</option>`}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="manual-jurusan" class="block text-sm font-medium text-white/90">Jurusan</label>
+                        <select id="manual-jurusan" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
+                            <option value="" class="bg-indigo-700">-- Pilih Jurusan --</option>
+                            ${currentUser.jurusanAjar ? currentUser.jurusanAjar.map(j => `<option value="${j}" class="bg-indigo-700">${j}</option>`).join('') : `<option value="" class="bg-indigo-700">(Data Jurusan tidak tersedia)</option>`}
+                        </select>
+                    </div>
+                     <div>
+                        <label for="manual-date" class="block text-sm font-medium text-white/90">Tanggal Absensi</label>
+                        <input type="date" id="manual-date" value="${currentDate}" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
+                    </div>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
+                        <span data-lucide="list-checks" class="w-4 h-4 mr-2"></span> Load Siswa
+                    </button>
+                </form>
+            </div>
+            
+            <div id="manual-attendance-area" class="mt-8">
+                            <p id="manual-message" class="text-center text-white/70 py-10">Pilih Kelas, Jurusan, dan Tanggal untuk memuat daftar siswa.</p>
+                        
+                            <!-- Student List Table (will be populated dynamically) -->
+                            <form id="manual-attendance-submit-form" class="hidden">
+                            <div id="student-list-container" class="overflow-x-auto rounded-lg shadow-lg border border-white/30 mb-6">
+                                <table class="min-w-full divide-y divide-white/20">
+                                    <thead class="glass-element">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">NISN</th>
+                                            <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Nama Siswa</th>
+                                            <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Status</th>
+                                            <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Keterangan</th>
+                                            <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider print-hidden">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="student-list-body" class="bg-white/10 divide-y divide-white/20">
+                                        <!-- Student rows here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
+                                <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Absensi Massal
+                            </button>
+                            </form>
+            </div>
+        `;
+    }
+
+    function renderTeacherAssessment() {
+        const currentDate = new Date().toISOString().split('T')[0];
+
+        return `
+            <h3 class="text-2xl font-bold text-white mb-6 flex items-center"><span data-lucide="file-plus" class="w-6 h-6 mr-2"></span> Input Penilaian Siswa</h3>
+            <p class="text-white/90 mb-6">Input nilai akan diperbarui ke Google Sheet.</p>
+            <div class="glass-element p-5 rounded-xl shadow-inner mb-6 print-hidden">
+                <form id="assessment-load-form" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                    <div>
+                        <label for="assessment-type" class="block text-sm font-medium text-white/90">Jenis Penilaian</label>
+                        <select id="assessment-type" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-green-500 focus:border-green-500 glass-element">
+                            <option value="harian" class="bg-indigo-700">Penilaian Harian</option>
+                            <option value="pts" class="bg-indigo-700">Penilaian Tengah Semester (PTS)</option>
+                            <option value="pas" class="bg-indigo-700">Penilaian Akhir Semester (PAS)</option>
+                        </select>
+                    </div>
+                    <div id="assessment-date-group">
+                        <label for="assessment-date" class="block text-sm font-medium text-white/90">Tanggal Penilaian</label>
+                        <input type="date" id="assessment-date" value="${currentDate}" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-green-500 focus:border-green-500 glass-element">
+                    </div>
+                    <div>
+                        <label for="assessment-kelas" class="block text-sm font-medium text-white/90">Kelas</label>
+                        <select id="assessment-kelas" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-green-500 focus:border-green-500 glass-element">
+                            <option value="" class="bg-indigo-700">-- Pilih Kelas --</option>
+                            ${currentUser.kelasAjar ? currentUser.kelasAjar.map(c => `<option value="${c}" class="bg-indigo-700">${c}</option>`).join('') : `<option value="" class="bg-indigo-700">(Data Kelas tidak tersedia)</option>`}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="assessment-jurusan" class="block text-sm font-medium text-white/90">Jurusan</label>
+                        <select id="assessment-jurusan" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-green-500 focus:border-green-500 glass-element">
+                            <option value="" class="bg-indigo-700">-- Pilih Jurusan --</option>
+                            ${currentUser.jurusanAjar ? currentUser.jurusanAjar.map(j => `<option value="${j}" class="bg-indigo-700">${j}</option>`).join('') : `<option value="" class="bg-indigo-700">(Data Jurusan tidak tersedia)</option>`}
+                        </select>
+                    </div>
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
+                        <span data-lucide="file-text" class="w-4 h-4 mr-2"></span> Muat Penilaian
+                    </button>
+                </form>
+            </div>
+            
+            <div id="assessment-area" class="mt-8">
+                <p id="assessment-message" class="text-center text-white/70 py-10">Pilih jenis penilaian, Kelas, dan Jurusan untuk memuat daftar siswa.</p>
+                
+                <form id="assessment-submit-form" class="hidden">
+                    <div id="assessment-student-list-container" class="overflow-x-auto rounded-lg shadow-lg border border-white/30 mb-6">
+                        <table class="min-w-full divide-y divide-white/20">
+                            <thead class="glass-element">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">NISN</th>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Nama Siswa</th>
+                                    <th id="assessment-score-label" class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Nilai (0-100)</th>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider print-hidden">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="assessment-student-list-body" class="bg-white/10 divide-y divide-white/20">
+                                <!-- Student rows here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
+                        <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Nilai Massal
+                    </button>
+                </form>
+            </div>
+        `;
+    }
+
+    function renderAdminConfiguration() {
+        return `
+            <h3 class="text-2xl font-bold text-white mb-6">Konfigurasi Aplikasi</h3>
+            <p class="text-white/90 mb-6">Perbarui detail sekolah yang ditampilkan di header aplikasi.</p>
+            <div class="glass-element p-6 rounded-lg shadow-inner mb-8 print-hidden">
+                <form id="admin-config-form" class="space-y-6">
+                    <div>
+                        <label for="config-school-name" class="block text-sm font-medium text-white/90">Nama Sekolah</label>
+                        <input type="text" id="config-school-name" value="${APP_CONFIG.SCHOOL_NAME}" required placeholder="Contoh: SMK Sehati Karawang" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
+                    </div>
+                    <div>
+                        <label for="config-logo-url" class="block text-sm font-medium text-white/90">URL Logo Sekolah (Link Langsung)</label>
+                        <input type="url" id="config-logo-url" value="${APP_CONFIG.LOGO_URL}" required placeholder="Contoh: https://link-gambar-logo-anda.png" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
+                        <p class="text-xs text-white/70 mt-1">Gunakan link langsung (Direct Link) atau string Base64 di bawah.</p>
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center transition duration-200 modern-hover">
+                            <span data-lucide="save" class="w-4 h-4 mr-2"></span> Simpan Konfigurasi
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="glass-element p-6 rounded-lg shadow-md space-y-4 print-hidden">
+                <h4 class="text-lg font-bold text-white">Opsi Alternatif: Logo Base64</h4>
+                <div>
+                    <label for="config-logo-base64" class="block text-sm font-medium text-white/90">Tempel String Base64 Gambar</label>
+                    <textarea id="config-logo-base64" rows="3" placeholder="Contoh: data:image/png;base64,iVBORw0KGgoAAAAN..." class="w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 resize-none glass-element"></textarea>
+                </div>
+                <button id="apply-base64-btn" type="button" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center transition duration-200 modern-hover">
+                    <span data-lucide="image" class="w-4 h-4 mr-2"></span> Terapkan Logo dari Base64
+                </button>
+            </div>
+        `;
+    }
+
+    function renderAdminGlobalRecap() {
+        const allClasses = currentUser.kelasAjar || [];
+        const allMajors = currentUser.jurusanAjar || []; // DIPERBAIKI: Menggunakan jurusanAjar untuk Jurusan
+
+        return `
+            <h3 class="text-2xl font-bold text-white mb-6">Rekapitulasi Global Absensi Siswa (Detail Harian)</h3>
+            <div class="glass-element p-5 rounded-lg shadow-inner mb-6 print-hidden">
+                <form id="admin-recap-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div>
+                        <label for="admin-rekap-kelas" class="block text-sm font-medium text-white/90">Kelas</label>
+                        <select id="admin-rekap-kelas" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
+                            <option value="" class="bg-indigo-700">-- Semua Kelas --</option>
+                            ${allClasses.map(c => `<option value="${c}" class="bg-indigo-700">${c}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="admin-rekap-jurusan" class="block text-sm font-medium text-white/90">Jurusan</label>
+                        <select id="admin-rekap-jurusan" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
+                            <option value="" class="bg-indigo-700">-- Semua Jurusan --</option>
+                            ${allMajors.map(j => `<option value="${j}" class="bg-indigo-700">${j}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="admin-rekap-periode" class="block text-sm font-medium text-white/90">Periode</label>
+                        <select id="admin-rekap-periode" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
+                            <option value="harian" class="bg-indigo-700">Harian</option>
+                            <option value="mingguan" class="bg-indigo-700">Mingguan</option>
+                            <option value="bulanan" class="bg-indigo-700">Bulanan</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
+                        <span data-lucide="search" class="w-4 h-4 mr-2"></span> Tampilkan Data
+                    </button>
+                </form>
+            </div>
+            
+            <div id="admin-recap-results" class="hidden">
+                ${generateRecapResultsTemplate('admin-recap-chart')}
+            </div>
+            <div id="admin-recap-message" class="text-center text-white/70 py-10">Silahkan pilih filter untuk melihat rekap data.</div>
+        `;
+    }
+
+    function renderAdminManagement() {
+        const allClasses = currentUser.kelasAjar || [];
+        const allMajors = currentUser.jurusanAjar || [];
+        
+        return `
+            <h3 class="text-2xl font-bold text-white mb-6">Manajemen Data Siswa</h3>
+            <p class="text-white/90 mb-6">Kelola data siswa, termasuk penambahan, pengeditan, dan penghapusan massal.</p>
+            <div class="glass-element p-5 rounded-lg shadow-inner mb-6 print-hidden">
+                <form id="admin-management-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div class="md:col-span-2">
+                        <label for="admin-search-student" class="block text-sm font-medium text-white/90">Cari NISN/Nama</label>
+                        <input type="text" id="admin-search-student" placeholder="Ketik NISN atau Nama Siswa" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
+                    </div>
+                    <div>
+                        <label for="admin-filter-kelas" class="block text-sm font-medium text-white/90">Kelas</label>
+                        <select id="admin-filter-kelas" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
+                            <option value="" class="bg-indigo-700">-- Semua Kelas --</option>
+                            ${allClasses.map(c => `<option value="${c}" class="bg-indigo-700">${c}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="admin-filter-jurusan" class="block text-sm font-medium text-white/90">Jurusan</label>
+                        <select id="admin-filter-jurusan" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
+                            <option value="" class="bg-indigo-700">-- Semua Jurusan --</option>
+                            ${allMajors.map(j => `<option value="${j}" class="bg-indigo-700">${j}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="col-span-1 md:col-span-4 flex justify-end">
+                              <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-6 rounded-lg flex items-center justify-center transition duration-200 modern-hover">
+                                  <span data-lucide="filter" class="w-4 h-4 mr-2"></span> Terapkan Filter
+                              </button>
+                    </div>
+                </form>
+            </div>
+            
+            <p id="admin-management-message" class="text-center text-white/70 py-10">Memuat data siswa...</p>
+            
+            <form id="admin-student-update-form" class="hidden">
+                             <div class="flex flex-col space-y-3 md:flex-row justify-between items-center mb-4 md:space-y-0 print-hidden">
+                             <button type="button" onclick="openAddStudentModal()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center transition duration-200 modern-hover">
+                                 <span data-lucide="user-plus" class="w-4 h-4 mr-2"></span> Tambah Siswa Baru
+                             </button>
+                             
+                             <div class="flex space-x-3 w-full md:w-auto">
+                                 <button onclick="openGoogleSheetLink()" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center transition duration-200 modern-hover">
+                                     <span data-lucide="external-link" class="w-4 h-4 mr-2"></span> Edit Data di Sheet
+                                 </button>
+                                 <!-- NEW BULK DELETE BUTTON (Perbaikan 3) -->
+                                 <button onclick="handleDeleteFilteredStudents()" type="button" id="bulk-delete-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center disabled:opacity-50" disabled>
+                                     <span data-lucide="trash-2" class="w-4 h-4 mr-2"></span> Hapus Berdasarkan Filter (<span id="filtered-count">0</span>)
+                                 </button>
+                             </div>
+                     </div>
+
+                <div id="admin-student-list-container" class="overflow-x-auto rounded-lg shadow-lg border border-white/30 mb-6">
+                    <table class="min-w-full divide-y divide-white/20">
+                        <thead class="glass-element">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">NISN (KEY)</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Nama Siswa</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Kelas</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Jurusan</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Email</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider print-hidden">Password</th>
+                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider print-hidden">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-student-list-body" class="bg-white/10 divide-y divide-white/20">
+                            <!-- Student rows here -->
+                        </tbody>
+                    </table>
+                </div>
+                            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
+                    <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Perubahan Data Massal
+                </button>
+            </form>
+        `;
+    }
+
+    // ====================================================================
+    // --- 4. CORE LOGIC (LOGIN, NAVIGATION, STATE) ---
+    // ====================================================================
+    
+    function renderDashboardTabs() {
+        const tabsContainer = document.querySelector('#dashboard-tabs nav');
+        tabsContainer.innerHTML = '';
+
+        TABS[currentUser.role].forEach(tab => {
+            const button = document.createElement('button');
+            button.id = `tab-${tab.id}`;
+            // NEW: Warna tab disesuaikan agar kontras elegan
+            button.className = `flex items-center px-4 py-2 text-sm font-medium rounded-t-lg transition-colors duration-150 text-white/70 hover:text-white hover:bg-white/10`;
+            button.innerHTML = `<span data-lucide="${tab.icon}" class="w-4 h-4 mr-2"></span>${tab.label}`;
+            button.onclick = () => selectTab(tab.id);
+            tabsContainer.appendChild(button);
+        });
+
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+    
+    async function renderTabContent(tabId) {
+        const contentDiv = document.getElementById('tab-content');
+        // PERBAIKAN: Kontras dan Ukuran Loading Message
+        contentDiv.innerHTML = `<div class="flex flex-col justify-center items-center py-10">
+            <div class="animate-spin mb-4">
+                <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
+            </div>
+            <span class="text-white text-lg font-bold">Memuat data...</span>
+        </div>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        hideMiniPopup();
+
+        if (tabId === 'absensi') {
+            await Promise.all([checkStudentAttendanceStatus(), getStudentHistory()]);
+        }
+        
+        contentDiv.innerHTML = '';
+
+        if (recapChartInstance) { recapChartInstance.destroy(); recapChartInstance = null; }
+        if (adminRecapChartInstance) { adminRecapChartInstance.destroy(); adminRecapChartInstance = null; }
+        // FIX: Ensure both comparison chart instances are destroyed
+        if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; } 
+        if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
+
+        if (tabId !== 'rekap-guru' && tabId !== 'rekap-admin') {
+            currentRecapData = [];
+        }
+        
+        if (tabId !== 'rekap-total') {
+            currentTotalRecapData = []; // Clear total recap state on tab change
+        }
+
+        currentRecapFilters = {}; // Clear print filters on tab change
+
+
+        switch (tabId) {
+            case 'absensi':
+                contentDiv.innerHTML = renderStudentAttendanceForm();
+                contentDiv.insertAdjacentHTML('beforeend', renderStudentAttendanceHistory());
+                setupAttendanceFormListeners();
+                break;
+            case 'profil':
+                contentDiv.innerHTML = renderProfilePage();
+                break;
+            case 'rekap-guru':
+                contentDiv.innerHTML = renderTeacherRecap();
+                setupTeacherRecapListeners();
+                break;
+            // NEW CASE: Rekap Total Absen
+            case 'rekap-total':
+                contentDiv.innerHTML = renderTeacherTotalRecap();
+                setupTeacherTotalRecapListeners();
+                break;
+            case 'perbandingan':
+                contentDiv.innerHTML = renderTeacherComparison();
+                setupTeacherComparisonListeners(); 
+                break;
+            case 'absensi-siswa':
+                contentDiv.innerHTML = renderTeacherStudentAttendance();
+                setupTeacherStudentAttendanceListeners(); 
+                break;
+            case 'penilaian':
+                contentDiv.innerHTML = renderTeacherAssessment();
+                setupTeacherAssessmentListeners();
+                break;
+            case 'rekap-admin':
+                contentDiv.innerHTML = renderAdminGlobalRecap();
+                setupAdminRecapListeners();
+                break;
+            case 'konfigurasi':
+                contentDiv.innerHTML = renderAdminConfiguration();
+                setupAdminConfigurationListeners(); // NEW HANDLER
+                break;
+            case 'manajemen':
+                contentDiv.innerHTML = renderAdminManagement();
+                setupAdminManagementListeners();
+                break;
+            default:
+                contentDiv.innerHTML = `<p class="text-center text-gray-500 py-10">Pilih menu di atas.</p>`;
+        }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+
+    function selectRole(roleId) {
+        currentRole = roleId;
+
+        if (roleId) {
+            const roleInfo = Object.values(ROLE_MAP).find(r => r.id === roleId);
+
+            Object.keys(ROLE_MAP).forEach(key => {
+                const role = ROLE_MAP[key];
+                // NEW: Menggunakan warna transparan untuk tombol yang tidak aktif
+                const btn = document.getElementById(`role-btn-${role.id}`);
+                btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg');
+                btn.classList.add('bg-white/20', 'text-white', 'hover:bg-white/40');
+            });
+            const selectedBtn = document.getElementById(`role-btn-${roleId}`);
+            
+            if (selectedBtn) {
+                // NEW: Menggunakan gradien untuk tombol yang aktif
+                selectedBtn.classList.remove('bg-white/20', 'text-white', 'hover:bg-white/40');
+                selectedBtn.classList.add('bg-gradient-to-r', 'from-blue-500', 'to-indigo-600', 'text-white', 'shadow-lg', 'shadow-blue-500/50');
+
+                const loginForm = document.getElementById('login-form');
+                const loginTitle = document.getElementById('login-title');
+                const usernameLabel = document.getElementById('username-label');
+                const usernameInput = document.getElementById('username');
+                
+                loginTitle.innerText = `Masuk sebagai ${roleInfo.label}`;
+                usernameLabel.innerHTML = `${roleInfo.label === 'Siswa' ? 'NISN' : 'NIP'} <span class="text-sm text-white/70">(${roleInfo.label})</span>`;
+                usernameInput.placeholder = roleInfo.placeholder;
+                loginForm.classList.remove('hidden');
+                document.getElementById('login-message').classList.add('hidden');
+                usernameInput.focus();
+            }
+        }
+    }
+
+
+    function loadAppState() {
+        const savedState = localStorage.getItem('absensiAppState');
+        if (savedState) {
+            try {
+                const state = JSON.parse(savedState);
+                
+                // PERBAIKAN BUG REFRESH: Hapus pengecekan tanggal harian yang agresif.
+                // Sesi akan dipertahankan selama user belum logout.
+                if (state.user && state.role && state.tab) {
+                    currentUser = state.user;
+                    currentRole = state.role;
+                    initializeDashboard(state.tab);
+                    return true;
+                } else {
+                    localStorage.removeItem('absensiAppState');
+                }
+            } catch (e) {
+                console.error("Gagal memuat status aplikasi dari localStorage:", e);
+                localStorage.removeItem('absensiAppState');
+            }
+        }
+        return false;
+    }
+
+    function saveAppState() {
+        if (currentUser && currentUser.role && currentTab) {
+            localStorage.setItem('absensiAppState', JSON.stringify({
+                role: currentUser.role,
+                tab: currentTab,
+                lastLoginDate: new Date().toISOString().split('T')[0], // Simpan tanggal login (untuk referensi, tidak wajib untuk sesi)
+                user: {
+                    nisn: currentUser.nisn, nip: currentUser.nip, nama: currentUser.nama,
+                    kelas: currentUser.kelas, jurusan: currentUser.jurusan,
+                    kelasAjar: currentUser.kelasAjar, jurusanAjar: currentUser.jurusanAjar,
+                    email: currentUser.email
+                }
+            }));
+        } else {
+            localStorage.removeItem('absensiAppState');
+        }
+    }
+
+    function initializeDashboard(initialTab = null) {
+        showPage('dashboard-container');
+        document.getElementById('welcome-message').innerText = `Selamat Datang, ${currentUser.nama}!`;
+        renderDashboardTabs();
+        
+        let tabToOpen = initialTab;
+        if (!tabToOpen) {
+            if (currentUser.role === 'student') tabToOpen = 'absensi';
+            else if (currentUser.role === 'teacher') tabToOpen = 'rekap-guru';
+            else if (currentUser.role === 'admin') tabToOpen = 'rekap-admin';
+        }
+        selectTab(tabToOpen);
+    }
+
+    function logout() {
+        if (recapChartInstance) { recapChartInstance.destroy(); recapChartInstance = null; }
+        if (adminRecapChartInstance) { adminRecapChartInstance.destroy(); adminRecapChartInstance = null; }
+        if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; }
+        if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
+
+        allStudentsData = []; currentRecapData = []; currentTotalRecapData = [];
+        currentUser = null; currentRole = null; currentTab = '';
+        saveAppState(); // Removes state
+
+        showPage('entry-page');
+        document.getElementById('username').value = '';
+        document.getElementById('password').value = '';
+        document.getElementById('login-message').classList.add('hidden');
+        document.getElementById('login-form').classList.add('hidden');
+        document.getElementById('login-title').innerText = 'Pilih Peran Anda';
+
+        Object.keys(ROLE_MAP).forEach(key => {
+            const role = ROLE_MAP[key];
+            const btn = document.getElementById(`role-btn-${role.id}`);
+            btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg');
+            btn.classList.add('bg-gray-100', 'text-gray-600', 'hover:bg-indigo-50', 'hover:text-indigo-700');
+        });
+    }
+
+    function selectTab(tabId) {
+        currentTab = tabId;
+        saveAppState();
+
+        document.querySelectorAll('#dashboard-tabs button').forEach(btn => {
+            // NEW: Warna tab disesuaikan agar kontras elegan (transparan/putih)
+            btn.classList.remove('text-indigo-700', 'border-b-4', 'border-indigo-700', 'bg-indigo-50');
+            btn.classList.add('text-white/70', 'hover:text-white', 'hover:bg-white/10');
+        });
+
+        const selectedBtn = document.getElementById(`tab-${tabId}`);
+        if (selectedBtn) {
+            // NEW: Warna tab aktif
+            selectedBtn.classList.remove('text-white/70', 'hover:text-white', 'hover:bg-white/10');
+            selectedBtn.classList.add('text-white', 'border-b-4', 'border-white', 'bg-white/20');
+        }
+
+        renderTabContent(tabId);
+    }
+
+
+    // ====================================================================
     // --- 7. HANDLER & LISTENER FUNCTIONS (Logic Interaktif) ---
     // ====================================================================
     
@@ -2401,7 +2996,13 @@
         demoContainer.classList.add('hidden');
         attendContainer.classList.add('hidden');
         messageDiv.classList.remove('hidden');
-        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-yellow-300"></span></div><span class="ml-3 text-white">Memuat data perbandingan ${filterType === 'class' ? 'kelas' : 'jurusan'}...</span></div>`;
+        // PERBAIKAN: Kontras dan Ukuran Loading Message
+        messageDiv.innerHTML = `<div class="flex flex-col justify-center items-center py-5">
+            <div class="animate-spin mb-4">
+                <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
+            </div>
+            <span class="text-white text-lg font-bold">Memuat data perbandingan ${filterType === 'class' ? 'kelas' : 'jurusan'}...</span>
+        </div>`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
         // 1. Fetch Comparison Data
@@ -2510,7 +3111,13 @@
         const submitForm = document.getElementById('manual-attendance-submit-form');
         
         submitForm.classList.add('hidden'); messageDiv.classList.remove('hidden');
-        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-indigo-500"></span></div><span class="ml-3 text-indigo-600">Memuat daftar siswa dan status absensi...</span></div>`;
+        // PERBAIKAN: Kontras dan Ukuran Loading Message
+        messageDiv.innerHTML = `<div class="flex flex-col justify-center items-center py-5">
+            <div class="animate-spin mb-4">
+                <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
+            </div>
+            <span class="text-white text-lg font-bold">Memuat daftar siswa dan status absensi...</span>
+        </div>`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
         
         if (!kelas || !jurusan || !date) {
@@ -2736,7 +3343,13 @@
         const submitForm = document.getElementById('assessment-submit-form');
         
         submitForm.classList.add('hidden'); messageDiv.classList.remove('hidden');
-        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-green-500"></span></div><span class="ml-3 text-green-600">Memuat daftar siswa dan data nilai...</span></div>`;
+        // PERBAIKAN: Kontras dan Ukuran Loading Message
+        messageDiv.innerHTML = `<div class="flex flex-col justify-center items-center py-5">
+            <div class="animate-spin mb-4">
+                <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
+            </div>
+            <span class="text-white text-lg font-bold">Memuat daftar siswa dan data nilai...</span>
+        </div>`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
         
         if (!kelas || !jurusan) {
@@ -2985,7 +3598,13 @@
 
         // Display loading message
         messageDiv.classList.remove('hidden');
-        messageDiv.innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-purple-500"></span></div><span class="ml-3 text-purple-600">Memuat data siswa...</span></div>`;
+        // PERBAIKAN: Kontras dan Ukuran Loading Message
+        messageDiv.innerHTML = `<div class="flex flex-col justify-center items-center py-5">
+            <div class="animate-spin mb-4">
+                <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
+            </div>
+            <span class="text-white text-lg font-bold">Memuat data siswa...</span>
+        </div>`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
         if (allStudentsData.length === 0) {
@@ -3202,7 +3821,13 @@
             
             document.getElementById('admin-student-list-body').innerHTML = '';
             document.getElementById('admin-management-message').classList.remove('hidden');
-            document.getElementById('admin-management-message').innerHTML = `<div class="flex justify-center items-center py-5"><div class="animate-spin"><span data-lucide="loader-circle" class="w-6 h-6 text-purple-500"></span></div><span class="ml-3 text-purple-600">Memproses filter...</span></div>`;
+            // PERBAIKAN: Kontras dan Ukuran Loading Message
+            document.getElementById('admin-management-message').innerHTML = `<div class="flex flex-col justify-center items-center py-5">
+                <div class="animate-spin mb-4">
+                    <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
+                </div>
+                <span class="text-white text-lg font-bold">Memproses filter...</span>
+            </div>`;
             if (typeof lucide !== 'undefined') lucide.createIcons();
 
             loadAllStudents(searchTerm, kelas, jurusan);
