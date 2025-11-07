@@ -452,6 +452,15 @@
     let currentFilterJurusan = '';
     let currentFilteredStudentCount = 0;
 
+    // --- NEW: Camera State ---
+    let videoElement = null;
+    let canvasElement = null;
+    let photoDataInput = null;
+    let photoPreview = null;
+    let captureButton = null;
+    let mediaStream = null;
+    // --- END NEW: Camera State ---
+
     const CURRENT_DATE_WIB = new Date().toLocaleString('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').join('-'); // YYYY-MM-DD
     
     let recapChartInstance = null;
@@ -856,7 +865,568 @@
         }
     }
 
+    // ====================================================================
+    // --- CORE STUDENT DATA FETCH HANDLERS (Moved to ensure definition before call) ---
+    // ====================================================================
 
+    async function checkStudentAttendanceStatus() {
+        currentAttendanceRecord = null;
+        if (currentUser.role !== 'student') return;
+
+        const url = `${WEB_APP_URL}?action=getStudentStatus&nisn=${currentUser.nisn}&date=${CURRENT_DATE_WIB}`;
+        const result = await fetchData(url);
+        
+        if (result && result.status === 'success') {
+            currentAttendanceRecord = result.record;
+        }
+    }
+
+    async function getStudentHistory() {
+        historyRecords = [];
+        if (currentUser.role !== 'student') return;
+
+        const url = `${WEB_APP_URL}?action=getStudentHistory&nisn=${currentUser.nisn}`;
+        const result = await fetchData(url);
+
+        if (result && result.status === 'success') {
+            historyRecords = result.records;
+        } else {
+             if (result && result.message && result.message.includes('Aksi tidak dikenali.')) {
+                 console.error(`Gagal memuat riwayat absensi: Aksi "getStudentHistory" tidak dikenali di Apps Script.`);
+                 showModal('Konfigurasi Server', 'Error: Aksi "getStudentHistory" tidak dikenali. Harap update Code.gs dan Redeploy Apps Script sebagai Versi Baru!', 'error', 7000);
+             } else {
+                 console.error(`Gagal memuat riwayat absensi: ${result ? result.message : 'Unknown Error'}`);
+             }
+        }
+    }
+
+
+    // ====================================================================
+    // --- 4. CORE LOGIC (LOGIN, NAVIGATION, STATE) --- (Updated)
+    // ====================================================================
+
+    function renderDashboardTabs() {
+        const tabsContainer = document.querySelector('#dashboard-tabs nav');
+        tabsContainer.innerHTML = '';
+
+        TABS[currentUser.role].forEach(tab => {
+            const button = document.createElement('button');
+            button.id = `tab-${tab.id}`;
+            // NEW: Warna tab disesuaikan agar kontras elegan
+            button.className = `flex items-center px-4 py-2 text-sm font-medium rounded-t-lg transition-colors duration-150 text-white/70 hover:text-white hover:bg-white/10`;
+            button.innerHTML = `<span data-lucide="${tab.icon}" class="w-4 h-4 mr-2"></span>${tab.label}`;
+            button.onclick = () => selectTab(tab.id);
+            tabsContainer.appendChild(button);
+        });
+
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+    
+    async function renderTabContent(tabId) {
+        const contentDiv = document.getElementById('tab-content');
+        // PERBAIKAN: Kontras dan Ukuran Loading Message
+        contentDiv.innerHTML = `<div class="flex flex-col justify-center items-center py-10">
+            <div class="animate-spin mb-4">
+                <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
+            </div>
+            <span class="text-white text-lg font-bold">Memuat data...</span>
+        </div>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        hideMiniPopup();
+
+        if (tabId === 'absensi') {
+            await Promise.all([checkStudentAttendanceStatus(), getStudentHistory()]);
+        }
+        
+        contentDiv.innerHTML = '';
+
+        if (recapChartInstance) { recapChartInstance.destroy(); recapChartInstance = null; }
+        if (adminRecapChartInstance) { adminRecapChartInstance.destroy(); adminRecapChartInstance = null; }
+        // FIX: Ensure both comparison chart instances are destroyed
+        if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; } 
+        if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
+
+        if (tabId !== 'rekap-guru' && tabId !== 'rekap-admin') {
+            currentRecapData = [];
+        }
+        
+        if (tabId !== 'rekap-total') {
+            currentTotalRecapData = []; // Clear total recap state on tab change
+        }
+
+        currentRecapFilters = {}; // Clear print filters on tab change
+
+
+        switch (tabId) {
+            case 'absensi':
+                contentDiv.innerHTML = renderStudentAttendanceForm();
+                contentDiv.insertAdjacentHTML('beforeend', renderStudentAttendanceHistory());
+                setupAttendanceFormListeners();
+                break;
+            case 'profil':
+                contentDiv.innerHTML = renderProfilePage();
+                break;
+            case 'rekap-guru':
+                contentDiv.innerHTML = renderTeacherRecap();
+                setupTeacherRecapListeners();
+                break;
+            // NEW CASE: Rekap Total Absen
+            case 'rekap-total':
+                contentDiv.innerHTML = renderTeacherTotalRecap();
+                setupTeacherTotalRecapListeners();
+                break;
+            case 'dashboard-grafik': // RENAMED
+                contentDiv.innerHTML = renderTeacherComparison();
+                setupTeacherComparisonListeners(); 
+                break;
+            case 'absensi-siswa':
+                contentDiv.innerHTML = renderTeacherStudentAttendance();
+                setupTeacherStudentAttendanceListeners(); 
+                break;
+            case 'penilaian':
+                contentDiv.innerHTML = renderTeacherAssessment();
+                setupTeacherAssessmentListeners();
+                break;
+            case 'rekap-admin':
+                contentDiv.innerHTML = renderAdminGlobalRecap();
+                setupAdminRecapListeners();
+                break;
+            case 'konfigurasi':
+                contentDiv.innerHTML = renderAdminConfiguration();
+                setupAdminConfigurationListeners(); // NEW HANDLER
+                break;
+            case 'manajemen':
+                contentDiv.innerHTML = renderAdminManagement();
+                setupAdminManagementListeners();
+                break;
+            default:
+                contentDiv.innerHTML = `<p class="text-center text-gray-500 py-10">Pilih menu di atas.</p>`;
+        }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+
+    function selectRole(roleId) {
+        currentRole = roleId;
+
+        if (roleId) {
+            const roleInfo = Object.values(ROLE_MAP).find(r => r.id === roleId);
+
+            Object.keys(ROLE_MAP).forEach(key => {
+                const role = ROLE_MAP[key];
+                // NEW: Menggunakan warna transparan untuk tombol yang tidak aktif
+                const btn = document.getElementById(`role-btn-${role.id}`);
+                btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg');
+                btn.classList.add('bg-white/20', 'text-white', 'hover:bg-white/40');
+            });
+            const selectedBtn = document.getElementById(`role-btn-${roleId}`);
+            
+            if (selectedBtn) {
+                // NEW: Menggunakan gradien untuk tombol yang aktif
+                selectedBtn.classList.remove('bg-white/20', 'text-white', 'hover:bg-white/40');
+                selectedBtn.classList.add('bg-gradient-to-r', 'from-blue-500', 'to-indigo-600', 'text-white', 'shadow-lg', 'shadow-blue-500/50');
+
+                const loginForm = document.getElementById('login-form');
+                const loginTitle = document.getElementById('login-title');
+                const usernameLabel = document.getElementById('username-label');
+                const usernameInput = document.getElementById('username');
+                
+                loginTitle.innerText = `Masuk sebagai ${roleInfo.label}`;
+                usernameLabel.innerHTML = `${roleInfo.label === 'Siswa' ? 'NISN' : 'NIP'} <span class="text-sm text-white/70">(${roleInfo.label})</span>`;
+                usernameInput.placeholder = roleInfo.placeholder;
+                loginForm.classList.remove('hidden');
+                document.getElementById('login-message').classList.add('hidden');
+                usernameInput.focus();
+            }
+        }
+    }
+
+    function loadAppState() {
+        const savedState = localStorage.getItem('absensiAppState');
+        if (savedState) {
+            try {
+                const state = JSON.parse(savedState);
+                
+                // PERBAIKAN BUG REFRESH: Hapus pengecekan tanggal harian yang agresif.
+                // Sesi akan dipertahankan selama user belum logout.
+                if (state.user && state.role && state.tab) {
+                    currentUser = state.user;
+                    currentRole = state.role;
+                    initializeDashboard(state.tab);
+                    return true;
+                } else {
+                    localStorage.removeItem('absensiAppState');
+                }
+            } catch (e) {
+                console.error("Gagal memuat status aplikasi dari localStorage:", e);
+                localStorage.removeItem('absensiAppState');
+            }
+        }
+        return false;
+    }
+
+    function saveAppState() {
+        if (currentUser && currentUser.role && currentTab) {
+            localStorage.setItem('absensiAppState', JSON.stringify({
+                role: currentUser.role,
+                tab: currentTab,
+                lastLoginDate: new Date().toISOString().split('T')[0], // Simpan tanggal login (untuk referensi, tidak wajib untuk sesi)
+                user: {
+                    nisn: currentUser.nisn, nip: currentUser.nip, nama: currentUser.nama,
+                    kelas: currentUser.kelas, jurusan: currentUser.jurusan,
+                    kelasAjar: currentUser.kelasAjar, jurusanAjar: currentUser.jurusanAjar,
+                    email: currentUser.email
+                }
+            }));
+        } else {
+            localStorage.removeItem('absensiAppState');
+        }
+    }
+
+    function initializeDashboard(initialTab = null) {
+        showPage('dashboard-container');
+        document.getElementById('welcome-message').innerText = `Selamat Datang, ${currentUser.nama}!`;
+        renderDashboardTabs();
+        
+        let tabToOpen = initialTab;
+        if (!tabToOpen) {
+            if (currentUser.role === 'student') tabToOpen = 'absensi';
+            else if (currentUser.role === 'teacher') tabToOpen = 'rekap-guru';
+            else if (currentUser.role === 'admin') tabToOpen = 'rekap-admin';
+        }
+        selectTab(tabToOpen);
+    }
+
+    function logout() {
+        stopCamera(); // Stop camera on logout
+        if (recapChartInstance) { recapChartInstance.destroy(); recapChartInstance = null; }
+        if (adminRecapChartInstance) { adminRecapChartInstance.destroy(); adminRecapChartInstance = null; }
+        if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; }
+        if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
+
+        allStudentsData = []; currentRecapData = []; currentTotalRecapData = [];
+        currentUser = null; currentRole = null; currentTab = '';
+        saveAppState(); // Removes state
+
+        showPage('entry-page');
+        document.getElementById('username').value = '';
+        document.getElementById('password').value = '';
+        document.getElementById('login-message').classList.add('hidden');
+        document.getElementById('login-form').classList.add('hidden');
+        document.getElementById('login-title').innerText = 'Pilih Peran Anda';
+
+        Object.keys(ROLE_MAP).forEach(key => {
+            const role = ROLE_MAP[key];
+            const btn = document.getElementById(`role-btn-${role.id}`);
+            btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg');
+            btn.classList.add('bg-gray-100', 'text-gray-600', 'hover:bg-indigo-50', 'hover:text-indigo-700');
+        });
+    }
+
+    function selectTab(tabId) {
+        stopCamera(); // Stop camera when navigating away from absensi tab
+
+        currentTab = tabId;
+        saveAppState();
+
+        document.querySelectorAll('#dashboard-tabs button').forEach(btn => {
+            // NEW: Warna tab disesuaikan agar kontras elegan (transparan/putih)
+            btn.classList.remove('text-indigo-700', 'border-b-4', 'border-indigo-700', 'bg-indigo-50');
+            btn.classList.add('text-white/70', 'hover:text-white', 'hover:bg-white/10');
+        });
+
+        const selectedBtn = document.getElementById(`tab-${tabId}`);
+        if (selectedBtn) {
+            // NEW: Warna tab aktif
+            selectedBtn.classList.remove('text-white/70', 'hover:text-white', 'hover:bg-white/10');
+            selectedBtn.classList.add('text-white', 'border-b-4', 'border-white', 'bg-white/20');
+        }
+
+        renderTabContent(tabId);
+    }
+    // ====================================================================
+    // --- 5. CHARTING & RECAP FUNCTIONS ---
+    // ====================================================================
+
+    function renderRecapSummary(id, summary) {
+        const total = summary['Total'] || 0;
+        const totalTidakHadir = (summary['Izin'] || 0) + (summary['Sakit'] || 0) + (summary['Alpha'] || 0);
+
+        const cardData = [
+            // NEW: Mengubah skema warna kartu dan teks menjadi lebih elegan di atas latar gelap
+            { label: "Total Siswa", value: total, icon: "users", color: "text-blue-300", bg: "bg-white/10", iconColor: "text-blue-300" },
+            { label: "Total Hadir", value: summary['Hadir'] || 0, icon: "check-circle", color: "text-emerald-300", bg: "bg-white/10", iconColor: "text-emerald-300" },
+            { label: "Total Tidak Hadir", value: totalTidakHadir, icon: "x-circle", color: "text-red-300", bg: "bg-white/10", iconColor: "text-red-300" },
+            { label: "Izin/Sakit", value: (summary['Izin'] || 0) + (summary['Sakit'] || 0), icon: "user-x", color: "text-amber-300", bg: "bg-white/10", iconColor: "text-amber-300" },
+            // PERBAIKAN: Warna Alpha menjadi merah menyala
+            { label: "Alpha", value: summary['Alpha'] || 0, icon: "skull", color: "text-rose-400 font-extrabold", bg: "bg-white/10", iconColor: "text-rose-400" }, 
+        ];
+
+        const html = cardData.map(card => `
+            <div class="${card.bg} p-4 rounded-xl flex items-center justify-between transition duration-200 modern-hover shadow-lg">
+                <div>
+                    <p class="text-sm font-medium text-white/70">${card.label}</p>
+                    <p class="text-2xl font-bold ${card.color}">${card.value}</p>
+                </div>
+                <span data-lucide="${card.icon}" class="${card.iconColor} w-8 h-8 opacity-70"></span>
+            </div>
+        `).join('');
+
+        document.getElementById(id).innerHTML = html;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function renderAttendanceChart(canvasId, summaryData, isTeacherRecap) {
+        // Mendapatkan konteks 2D untuk membuat gradien
+        const ctx = document.getElementById(canvasId).getContext('2d'); 
+        let currentInstance = (canvasId === 'recap-chart') ? recapChartInstance : adminRecapChartInstance;
+        if (currentInstance) currentInstance.destroy();
+
+        // --- NEW: Custom Neon Gradient Colors matching image theme ---
+        const createNeonGradient = (colorStart, colorEnd) => {
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, colorStart);
+            gradient.addColorStop(1, colorEnd);
+            return gradient;
+        };
+
+        const gradientHadir = createNeonGradient('#10b981', '#059669'); // Green
+        const gradientIzin = createNeonGradient('#f59e0b', '#d97706'); // Amber
+        const gradientSakit = createNeonGradient('#ef4444', '#dc2626'); // Red
+        const gradientAlpha = createNeonGradient('#f43f5e', '#be123c'); // PERBAIKAN: Merah Rose (Neon Red/Scarlet)
+        
+        // --- END Gradient Logic ---
+
+        const chartData = {
+            labels: ['Hadir', 'Izin', 'Sakit', 'Alpha'],
+            datasets: [{
+                label: 'Jumlah Siswa',
+                data: [
+                    summaryData['Hadir'] || 0, summaryData['Izin'] || 0,
+                    summaryData['Sakit'] || 0, summaryData['Alpha'] || 0
+                ],
+                backgroundColor: [gradientHadir, gradientIzin, gradientSakit, gradientAlpha],
+                // NEW: Menggunakan warna neon/terang untuk border
+                borderColor: ['#34d399', '#fcd34d', '#f87171', '#f43f5e'], // Boundary ke Merah Rose
+                borderWidth: 3, 
+                borderRadius: 15, 
+                borderSkipped: false,
+                hoverBackgroundColor: ['#34d399', '#fcd34d', '#f87171', '#f43f5e'],
+            }]
+        };
+
+        const newChart = new Chart(ctx.canvas, {
+            type: 'bar',
+            data: chartData,
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { 
+                    legend: { display: false }, 
+                    tooltip: { 
+                        callbacks: { label: (c) => `${c.label}: ${c.parsed.y} Siswa` },
+                        backgroundColor: 'rgba(30, 41, 59, 0.9)', // Dark background for tooltip
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: '#7c3aed',
+                        borderWidth: 1,
+                        boxPadding: 8,
+                        usePointStyle: true,
+                        // NEW: Custom hover effect
+                        caretPadding: 10,
+                    } 
+                },
+                layout: {
+                    padding: { top: 10, bottom: 10 }
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true, 
+                        ticks: { 
+                            stepSize: 1, 
+                            callback: (v) => Number.isInteger(v) ? v : null, 
+                            font: { size: 13 },
+                            color: '#e5e7eb' // Light ticks color
+                        }, 
+                        grid: { 
+                            drawBorder: false, 
+                            color: 'rgba(255, 255, 255, 0.15)' // Subtle grid lines
+                        } 
+                    },
+                    x: { 
+                        grid: { display: false },
+                        ticks: { font: { size: 13, weight: 'bold' }, color: '#e5e7eb' } // Light ticks color
+                    }
+                }
+            },
+        });
+
+        if (canvasId === 'recap-chart') recapChartInstance = newChart;
+        else if (canvasId === 'admin-recap-chart') adminRecapChartInstance = newChart;
+    }
+
+    function renderDemographicChart(canvasId, data, chartTitle) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+
+        if (comparisonChartInstanceClass) comparisonChartInstanceClass.destroy();
+        comparisonChartInstanceClass = null;
+
+        // --- NEW: Gradient for Demographics (Neon Blue) ---
+        const gradientDemo = ctx.createLinearGradient(0, 0, 0, 400);
+        gradientDemo.addColorStop(0, '#38bdf8'); // Sky Blue
+        gradientDemo.addColorStop(1, '#1e40af'); // Dark Blue
+
+        const labels = data.map(d => d.label);
+        const values = data.map(d => d.value);
+
+        const chartData = {
+            labels: labels,
+            datasets: [{
+                label: 'Jumlah Total Siswa',
+                data: values,
+                backgroundColor: gradientDemo, // Use gradient
+                borderColor: '#38bdf8',
+                borderWidth: 3, 
+                borderRadius: 15, 
+                borderSkipped: false,
+            }]
+        };
+
+        const newChart = new Chart(ctx.canvas, {
+            type: 'bar',
+            data: chartData,
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { 
+                    legend: { display: false }, 
+                    title: { display: true, text: chartTitle, font: { size: 18, weight: 'bold', family: 'Inter' }, color: '#fff' }, // Light color for title
+                    tooltip: { 
+                        callbacks: { label: (c) => `Total Siswa: ${c.parsed.y}` },
+                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: '#38bdf8',
+                        borderWidth: 1,
+                        boxPadding: 8,
+                        usePointStyle: true,
+                    } 
+                },
+                layout: {
+                    padding: { top: 10, bottom: 10 }
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true, 
+                        title: { display: true, text: 'Jumlah Siswa', font: { size: 14 }, color: '#e5e7eb' },
+                        ticks: { stepSize: 1, callback: (v) => Number.isInteger(v) ? v : null, font: { size: 13 }, color: '#e5e7eb' }, 
+                        grid: { drawBorder: false, color: 'rgba(255, 255, 255, 0.15)' } 
+                    },
+                    x: { 
+                        title: { display: true, text: 'Kelas/Jurusan', font: { size: 14 }, color: '#e5e7eb' },
+                        grid: { display: false },
+                        ticks: { font: { size: 13, weight: 'bold' }, color: '#e5e7eb' }
+                    }
+                }
+            },
+        });
+
+        comparisonChartInstanceClass = newChart;
+    }
+    
+    // NEW: Render chart untuk Kehadiran (Perbaikan 1)
+    function renderAttendanceComparisonChart(canvasId, data, filterType) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+
+        // FIX: Ensure previous instance is destroyed
+        if (comparisonChartInstanceMajor) comparisonChartInstanceMajor.destroy();
+        comparisonChartInstanceMajor = null;
+
+        // --- NEW: Dynamic Neon Gradient Colors for Stacked Bars ---
+        const createNeonGradient = (colorStart, colorEnd) => {
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, colorStart);
+            gradient.addColorStop(1, colorEnd);
+            return gradient;
+        };
+
+        const colors = {
+            // Using brighter colors for visibility on dark glassmorphism
+            'Hadir': { bg: createNeonGradient('#34d399', '#059669'), border: '#34d399' },
+            'Izin': { bg: createNeonGradient('#fcd34d', '#d97706'), border: '#fcd34d' },
+            'Sakit': { bg: createNeonGradient('#f87171', '#dc2626'), border: '#f87171' },
+            'Alpha': { bg: createNeonGradient('#f43f5e', '#be123c'), border: '#f43f5e' } // PERBAIKAN: Merah Rose (Neon Red/Scarlet)
+        };
+        // --- END Gradient Logic ---
+
+        const labels = Object.keys(data); // Nama Kelas/Jurusan (or composite key)
+        const statuses = ['Hadir', 'Izin', 'Sakit', 'Alpha'];
+
+        const datasets = statuses.map(status => ({
+            label: status,
+            data: labels.map(label => data[label][status] || 0),
+            backgroundColor: colors[status].bg,
+            borderColor: colors[status].border,
+            borderWidth: 1,
+            stack: 'Stack 0', // Untuk membuat stacked bar
+            borderRadius: 5, // Added rounding
+            borderSkipped: false,
+        }));
+        
+        // Dynamic title based on filterType
+        let chartTitleAttend;
+        if (filterType === 'class') {
+            chartTitleAttend = 'Persentase Kehadiran per Kelas';
+        } else if (filterType === 'major') {
+            const gradeLevel = document.getElementById('comparison-grade-level').value;
+            chartTitleAttend = `Persentase Kehadiran per Jurusan & Tingkat (${gradeLevel || 'Semua Tingkat'})`;
+        }
+
+
+        const newChart = new Chart(ctx.canvas, {
+            type: 'bar',
+            data: { labels: labels, datasets: datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: chartTitleAttend, font: { size: 18, weight: 'bold', family: 'Inter' }, color: '#fff' }, // UPDATED: uses local chartTitleAttend
+                    legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 14 }, color: '#e5e7eb' } },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: '#7c3aed',
+                        borderWidth: 1,
+                        boxPadding: 8,
+                        callbacks: {
+                            label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(2)}%`, // Display percentage with 2 decimals
+                            title: (context) => `${context[0].label} (Total: ${data[context[0].label].TotalRecords} records)`
+                        }
+                    }
+                },
+                scales: {
+                    x: { 
+                        stacked: true, 
+                        grid: { display: false },
+                        ticks: { font: { size: 13, weight: 'bold' }, color: '#e5e7eb' } 
+                    },
+                    y: { 
+                        stacked: true, 
+                        beginAtZero: true, 
+                        max: 100, 
+                        title: { display: true, text: 'Persentase Kehadiran (%)', font: { size: 14 }, color: '#e5e7eb' },
+                        ticks: { 
+                            callback: function(value) { return value + '%'; }, // Add % to tick labels
+                            color: '#e5e7eb' 
+                        },
+                        grid: { color: 'rgba(255, 255, 255, 0.15)' }
+                    }
+                }
+            }
+        });
+
+        comparisonChartInstanceMajor = newChart;
+    }
     // ====================================================================
     // --- 6. RENDERING FUNCTIONS (Membangun Struktur HTML) ---
     // ====================================================================
@@ -873,6 +1443,7 @@
                 <div class="bg-emerald-700/30 border-l-4 border-emerald-500 p-4 rounded-lg shadow-md transition duration-200 modern-hover text-white">
                     <p class="font-semibold text-emerald-300">Anda telah mengisi absensi pada ${record.date}.</p>
                     <p class="mt-2 text-sm text-white/90">Status Anda: <span class="font-bold">${record.status}</span>. ${record.keterangan && record.keterangan !== '-' ? 'Keterangan: ' + record.keterangan : ''}</p>
+                    <p class="mt-2 text-xs text-white/60">Verifikasi Foto Anda: <img src="${record.photo || 'https://placehold.co/100x75/4f46e5/ffffff?text=NO+PHOTO'}" class="h-10 w-10 rounded-full inline-block object-cover"></p>
                 </div>
             `;
         } else {
@@ -882,6 +1453,32 @@
                     <p class="font-semibold text-indigo-300">Tanggal: ${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
                 </div>
                 <form id="attendance-form" class="space-y-6">
+                    <!-- NEW: Camera Section -->
+                    <div class="space-y-4">
+                        <label class="block text-sm font-medium text-white/90">Ambil Foto Kehadiran <span class="text-red-400">*</span></label>
+                        <div class="flex flex-col md:flex-row gap-4 items-center">
+                            <!-- Video Stream -->
+                            <div class="w-full md:w-1/2 rounded-xl overflow-hidden shadow-2xl bg-gray-900 border-4 border-white/30">
+                                <video id="video-stream" autoplay playsinline class="w-full h-auto" style="display: block;"></video>
+                                <canvas id="photo-canvas" class="hidden w-full h-full"></canvas>
+                                <!-- Placeholder for fallback -->
+                                <div id="video-fallback" class="w-full h-40 flex items-center justify-center text-white/50 text-sm hidden">
+                                    <span data-lucide="video-off" class="w-6 h-6 mr-2"></span> Kamera tidak tersedia atau sedang dimuat.
+                                </div>
+                            </div>
+                            <!-- Capture Button / Photo Preview -->
+                            <div class="w-full md:w-1/2 flex flex-col items-center justify-center space-y-3">
+                                <button type="button" id="capture-photo-btn" class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 rounded-lg shadow-xl modern-hover flex items-center justify-center disabled:opacity-50">
+                                    <span data-lucide="camera" class="w-5 h-5 mr-2"></span> Ambil Foto
+                                </button>
+                                <img id="photo-preview" class="hidden w-full h-auto max-h-48 rounded-xl shadow-2xl border-4 border-emerald-500 object-cover" alt="Preview Foto Absensi">
+                                <p id="photo-status" class="text-sm text-white/70">Tekan 'Ambil Foto' untuk verifikasi wajah.</p>
+                                <input type="hidden" id="photo-data" name="photo-data" required data-validation-message="Harap ambil foto untuk melanjutkan absensi.">
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END: Camera Section -->
+
                     <div>
                         <label class="block text-sm font-medium text-white/90 mb-2">Status Kehadiran <span class="text-red-400">*</span></label>
                         <div class="flex flex-wrap gap-4" id="status-options">
@@ -915,6 +1512,7 @@
         
         return formSection;
     }
+    // ... (rest of the render functions)
 
     function renderStudentAttendanceHistory() {
         let historyHtml = `
@@ -972,7 +1570,7 @@
         historyHtml += `</div>`;
         return historyHtml;
     }
-
+    
     function renderProfilePage() {
         return `
             <h3 class="text-2xl font-bold text-white mb-6">Profil ${currentUser.role === 'student' ? 'Siswa' : 'Pengguna'}</h3>
@@ -1012,7 +1610,7 @@
             </p>
         `;
     }
-
+    
     function generateRecapResultsTemplate(canvasId) {
         const tableBodyId = canvasId.replace('-chart', '-table-body');
         
@@ -1217,7 +1815,7 @@
                     <!-- Empty Div for alignment on md screens -->
                     <div></div> 
                     <div class="md:col-span-1">
-                        <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
+                        <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
                             <span data-lucide="eye" class="w-4 h-4 mr-2"></span> Tampilkan Grafik
                         </button>
                     </div>
@@ -1533,789 +2131,115 @@
     }
 
     // ====================================================================
-    // --- 4. CORE LOGIC (LOGIN, NAVIGATION, STATE) ---
-    // ====================================================================
-    
-    function renderDashboardTabs() {
-        const tabsContainer = document.querySelector('#dashboard-tabs nav');
-        tabsContainer.innerHTML = '';
-
-        TABS[currentUser.role].forEach(tab => {
-            const button = document.createElement('button');
-            button.id = `tab-${tab.id}`;
-            // NEW: Warna tab disesuaikan agar kontras elegan
-            button.className = `flex items-center px-4 py-2 text-sm font-medium rounded-t-lg transition-colors duration-150 text-white/70 hover:text-white hover:bg-white/10`;
-            button.innerHTML = `<span data-lucide="${tab.icon}" class="w-4 h-4 mr-2"></span>${tab.label}`;
-            button.onclick = () => selectTab(tab.id);
-            tabsContainer.appendChild(button);
-        });
-
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
-    
-    async function renderTabContent(tabId) {
-        const contentDiv = document.getElementById('tab-content');
-        // PERBAIKAN: Kontras dan Ukuran Loading Message
-        contentDiv.innerHTML = `<div class="flex flex-col justify-center items-center py-10">
-            <div class="animate-spin mb-4">
-                <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
-            </div>
-            <span class="text-white text-lg font-bold">Memuat data...</span>
-        </div>`;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-        hideMiniPopup();
-
-        if (tabId === 'absensi') {
-            await Promise.all([checkStudentAttendanceStatus(), getStudentHistory()]);
-        }
-        
-        contentDiv.innerHTML = '';
-
-        if (recapChartInstance) { recapChartInstance.destroy(); recapChartInstance = null; }
-        if (adminRecapChartInstance) { adminRecapChartInstance.destroy(); adminRecapChartInstance = null; }
-        // FIX: Ensure both comparison chart instances are destroyed
-        if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; } 
-        if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
-
-        if (tabId !== 'rekap-guru' && tabId !== 'rekap-admin') {
-            currentRecapData = [];
-        }
-        
-        if (tabId !== 'rekap-total') {
-            currentTotalRecapData = []; // Clear total recap state on tab change
-        }
-
-        currentRecapFilters = {}; // Clear print filters on tab change
-
-
-        switch (tabId) {
-            case 'absensi':
-                contentDiv.innerHTML = renderStudentAttendanceForm();
-                contentDiv.insertAdjacentHTML('beforeend', renderStudentAttendanceHistory());
-                setupAttendanceFormListeners();
-                break;
-            case 'profil':
-                contentDiv.innerHTML = renderProfilePage();
-                break;
-            case 'rekap-guru':
-                contentDiv.innerHTML = renderTeacherRecap();
-                setupTeacherRecapListeners();
-                break;
-            // NEW CASE: Rekap Total Absen
-            case 'rekap-total':
-                contentDiv.innerHTML = renderTeacherTotalRecap();
-                setupTeacherTotalRecapListeners();
-                break;
-            case 'dashboard-grafik': // RENAMED
-                contentDiv.innerHTML = renderTeacherComparison();
-                setupTeacherComparisonListeners(); 
-                break;
-            case 'absensi-siswa':
-                contentDiv.innerHTML = renderTeacherStudentAttendance();
-                setupTeacherStudentAttendanceListeners(); 
-                break;
-            case 'penilaian':
-                contentDiv.innerHTML = renderTeacherAssessment();
-                setupTeacherAssessmentListeners();
-                break;
-            case 'rekap-admin':
-                contentDiv.innerHTML = renderAdminGlobalRecap();
-                setupAdminRecapListeners();
-                break;
-            case 'konfigurasi':
-                contentDiv.innerHTML = renderAdminConfiguration();
-                setupAdminConfigurationListeners(); // NEW HANDLER
-                break;
-            case 'manajemen':
-                contentDiv.innerHTML = renderAdminManagement();
-                setupAdminManagementListeners();
-                break;
-            default:
-                contentDiv.innerHTML = `<p class="text-center text-gray-500 py-10">Pilih menu di atas.</p>`;
-        }
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
-
-
-    function selectRole(roleId) {
-        currentRole = roleId;
-
-        if (roleId) {
-            const roleInfo = Object.values(ROLE_MAP).find(r => r.id === roleId);
-
-            Object.keys(ROLE_MAP).forEach(key => {
-                const role = ROLE_MAP[key];
-                // NEW: Menggunakan warna transparan untuk tombol yang tidak aktif
-                const btn = document.getElementById(`role-btn-${role.id}`);
-                btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg');
-                btn.classList.add('bg-white/20', 'text-white', 'hover:bg-white/40');
-            });
-            const selectedBtn = document.getElementById(`role-btn-${roleId}`);
-            
-            if (selectedBtn) {
-                // NEW: Menggunakan gradien untuk tombol yang aktif
-                selectedBtn.classList.remove('bg-white/20', 'text-white', 'hover:bg-white/40');
-                selectedBtn.classList.add('bg-gradient-to-r', 'from-blue-500', 'to-indigo-600', 'text-white', 'shadow-lg', 'shadow-blue-500/50');
-
-                const loginForm = document.getElementById('login-form');
-                const loginTitle = document.getElementById('login-title');
-                const usernameLabel = document.getElementById('username-label');
-                const usernameInput = document.getElementById('username');
-                
-                loginTitle.innerText = `Masuk sebagai ${roleInfo.label}`;
-                usernameLabel.innerHTML = `${roleInfo.label === 'Siswa' ? 'NISN' : 'NIP'} <span class="text-sm text-white/70">(${roleInfo.label})</span>`;
-                usernameInput.placeholder = roleInfo.placeholder;
-                loginForm.classList.remove('hidden');
-                document.getElementById('login-message').classList.add('hidden');
-                usernameInput.focus();
-            }
-        }
-    }
-
-
-    function loadAppState() {
-        const savedState = localStorage.getItem('absensiAppState');
-        if (savedState) {
-            try {
-                const state = JSON.parse(savedState);
-                
-                // PERBAIKAN BUG REFRESH: Hapus pengecekan tanggal harian yang agresif.
-                // Sesi akan dipertahankan selama user belum logout.
-                if (state.user && state.role && state.tab) {
-                    currentUser = state.user;
-                    currentRole = state.role;
-                    initializeDashboard(state.tab);
-                    return true;
-                } else {
-                    localStorage.removeItem('absensiAppState');
-                }
-            } catch (e) {
-                console.error("Gagal memuat status aplikasi dari localStorage:", e);
-                localStorage.removeItem('absensiAppState');
-            }
-        }
-        return false;
-    }
-
-    function saveAppState() {
-        if (currentUser && currentUser.role && currentTab) {
-            localStorage.setItem('absensiAppState', JSON.stringify({
-                role: currentUser.role,
-                tab: currentTab,
-                lastLoginDate: new Date().toISOString().split('T')[0], // Simpan tanggal login (untuk referensi, tidak wajib untuk sesi)
-                user: {
-                    nisn: currentUser.nisn, nip: currentUser.nip, nama: currentUser.nama,
-                    kelas: currentUser.kelas, jurusan: currentUser.jurusan,
-                    kelasAjar: currentUser.kelasAjar, jurusanAjar: currentUser.jurusanAjar,
-                    email: currentUser.email
-                }
-            }));
-        } else {
-            localStorage.removeItem('absensiAppState');
-        }
-    }
-
-    function initializeDashboard(initialTab = null) {
-        showPage('dashboard-container');
-        document.getElementById('welcome-message').innerText = `Selamat Datang, ${currentUser.nama}!`;
-        renderDashboardTabs();
-        
-        let tabToOpen = initialTab;
-        if (!tabToOpen) {
-            if (currentUser.role === 'student') tabToOpen = 'absensi';
-            else if (currentUser.role === 'teacher') tabToOpen = 'rekap-guru';
-            else if (currentUser.role === 'admin') tabToOpen = 'rekap-admin';
-        }
-        selectTab(tabToOpen);
-    }
-
-    function logout() {
-        if (recapChartInstance) { recapChartInstance.destroy(); recapChartInstance = null; }
-        if (adminRecapChartInstance) { adminRecapChartInstance.destroy(); adminRecapChartInstance = null; }
-        if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; }
-        if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
-
-        allStudentsData = []; currentRecapData = []; currentTotalRecapData = [];
-        currentUser = null; currentRole = null; currentTab = '';
-        saveAppState(); // Removes state
-
-        showPage('entry-page');
-        document.getElementById('username').value = '';
-        document.getElementById('password').value = '';
-        document.getElementById('login-message').classList.add('hidden');
-        document.getElementById('login-form').classList.add('hidden');
-        document.getElementById('login-title').innerText = 'Pilih Peran Anda';
-
-        Object.keys(ROLE_MAP).forEach(key => {
-            const role = ROLE_MAP[key];
-            const btn = document.getElementById(`role-btn-${role.id}`);
-            btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg');
-            btn.classList.add('bg-gray-100', 'text-gray-600', 'hover:bg-indigo-50', 'hover:text-indigo-700');
-        });
-    }
-
-    function selectTab(tabId) {
-        currentTab = tabId;
-        saveAppState();
-
-        document.querySelectorAll('#dashboard-tabs button').forEach(btn => {
-            // NEW: Warna tab disesuaikan agar kontras elegan (transparan/putih)
-            btn.classList.remove('text-indigo-700', 'border-b-4', 'border-indigo-700', 'bg-indigo-50');
-            btn.classList.add('text-white/70', 'hover:text-white', 'hover:bg-white/10');
-        });
-
-        const selectedBtn = document.getElementById(`tab-${tabId}`);
-        if (selectedBtn) {
-            // NEW: Warna tab aktif
-            selectedBtn.classList.remove('text-white/70', 'hover:text-white', 'hover:bg-white/10');
-            selectedBtn.classList.add('text-white', 'border-b-4', 'border-white', 'bg-white/20');
-        }
-
-        renderTabContent(tabId);
-    }
-
-
-    // ====================================================================
-    // --- 5. CHARTING & RECAP FUNCTIONS ---
-    // ====================================================================
-
-    function renderRecapSummary(id, summary) {
-        const total = summary['Total'] || 0;
-        const totalTidakHadir = (summary['Izin'] || 0) + (summary['Sakit'] || 0) + (summary['Alpha'] || 0);
-
-        const cardData = [
-            // NEW: Mengubah skema warna kartu dan teks menjadi lebih elegan di atas latar gelap
-            { label: "Total Siswa", value: total, icon: "users", color: "text-blue-300", bg: "bg-white/10", iconColor: "text-blue-300" },
-            { label: "Total Hadir", value: summary['Hadir'] || 0, icon: "check-circle", color: "text-emerald-300", bg: "bg-white/10", iconColor: "text-emerald-300" },
-            { label: "Total Tidak Hadir", value: totalTidakHadir, icon: "x-circle", color: "text-red-300", bg: "bg-white/10", iconColor: "text-red-300" },
-            { label: "Izin/Sakit", value: (summary['Izin'] || 0) + (summary['Sakit'] || 0), icon: "user-x", color: "text-amber-300", bg: "bg-white/10", iconColor: "text-amber-300" },
-            // PERBAIKAN: Warna Alpha menjadi merah menyala
-            { label: "Alpha", value: summary['Alpha'] || 0, icon: "skull", color: "text-rose-400 font-extrabold", bg: "bg-white/10", iconColor: "text-rose-400" }, 
-        ];
-
-        const html = cardData.map(card => `
-            <div class="${card.bg} p-4 rounded-xl flex items-center justify-between transition duration-200 modern-hover shadow-lg">
-                <div>
-                    <p class="text-sm font-medium text-white/70">${card.label}</p>
-                    <p class="text-2xl font-bold ${card.color}">${card.value}</p>
-                </div>
-                <span data-lucide="${card.icon}" class="${card.iconColor} w-8 h-8 opacity-70"></span>
-            </div>
-        `).join('');
-
-        document.getElementById(id).innerHTML = html;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
-
-    function renderAttendanceChart(canvasId, summaryData, isTeacherRecap) {
-        // Mendapatkan konteks 2D untuk membuat gradien
-        const ctx = document.getElementById(canvasId).getContext('2d'); 
-        let currentInstance = (canvasId === 'recap-chart') ? recapChartInstance : adminRecapChartInstance;
-        if (currentInstance) currentInstance.destroy();
-
-        // --- NEW: Custom Neon Gradient Colors matching image theme ---
-        const createNeonGradient = (colorStart, colorEnd) => {
-            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-            gradient.addColorStop(0, colorStart);
-            gradient.addColorStop(1, colorEnd);
-            return gradient;
-        };
-
-        const gradientHadir = createNeonGradient('#10b981', '#059669'); // Green
-        const gradientIzin = createNeonGradient('#f59e0b', '#d97706'); // Amber
-        const gradientSakit = createNeonGradient('#ef4444', '#dc2626'); // Red
-        const gradientAlpha = createNeonGradient('#f43f5e', '#be123c'); // PERBAIKAN: Merah Rose (Neon Red/Scarlet)
-        
-        // --- END Gradient Logic ---
-
-        const chartData = {
-            labels: ['Hadir', 'Izin', 'Sakit', 'Alpha'],
-            datasets: [{
-                label: 'Jumlah Siswa',
-                data: [
-                    summaryData['Hadir'] || 0, summaryData['Izin'] || 0,
-                    summaryData['Sakit'] || 0, summaryData['Alpha'] || 0
-                ],
-                backgroundColor: [gradientHadir, gradientIzin, gradientSakit, gradientAlpha],
-                // NEW: Menggunakan warna neon/terang untuk border
-                borderColor: ['#34d399', '#fcd34d', '#f87171', '#f43f5e'], // Boundary ke Merah Rose
-                borderWidth: 3, 
-                borderRadius: 15, 
-                borderSkipped: false,
-                hoverBackgroundColor: ['#34d399', '#fcd34d', '#f87171', '#f43f5e'],
-            }]
-        };
-
-        const newChart = new Chart(ctx.canvas, {
-            type: 'bar',
-            data: chartData,
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { 
-                    legend: { display: false }, 
-                    tooltip: { 
-                        callbacks: { label: (c) => `${c.label}: ${c.parsed.y} Siswa` },
-                        backgroundColor: 'rgba(30, 41, 59, 0.9)', // Dark background for tooltip
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        borderColor: '#7c3aed',
-                        borderWidth: 1,
-                        boxPadding: 8,
-                        usePointStyle: true,
-                        // NEW: Custom hover effect
-                        caretPadding: 10,
-                    } 
-                },
-                layout: {
-                    padding: { top: 10, bottom: 10 }
-                },
-                scales: {
-                    y: { 
-                        beginAtZero: true, 
-                        ticks: { 
-                            stepSize: 1, 
-                            callback: (v) => Number.isInteger(v) ? v : null, 
-                            font: { size: 13 },
-                            color: '#e5e7eb' // Light ticks color
-                        }, 
-                        grid: { 
-                            drawBorder: false, 
-                            color: 'rgba(255, 255, 255, 0.15)' // Subtle grid lines
-                        } 
-                    },
-                    x: { 
-                        grid: { display: false },
-                        ticks: { font: { size: 13, weight: 'bold' }, color: '#e5e7eb' } // Light ticks color
-                    }
-                }
-            },
-        });
-
-        if (canvasId === 'recap-chart') recapChartInstance = newChart;
-        else if (canvasId === 'admin-recap-chart') adminRecapChartInstance = newChart;
-    }
-
-    function renderDemographicChart(canvasId, data, chartTitle) {
-        const ctx = document.getElementById(canvasId).getContext('2d');
-
-        if (comparisonChartInstanceClass) comparisonChartInstanceClass.destroy();
-        comparisonChartInstanceClass = null;
-
-        // --- NEW: Gradient for Demographics (Neon Blue) ---
-        const gradientDemo = ctx.createLinearGradient(0, 0, 0, 400);
-        gradientDemo.addColorStop(0, '#38bdf8'); // Sky Blue
-        gradientDemo.addColorStop(1, '#1e40af'); // Dark Blue
-
-        const labels = data.map(d => d.label);
-        const values = data.map(d => d.value);
-
-        const chartData = {
-            labels: labels,
-            datasets: [{
-                label: 'Jumlah Total Siswa',
-                data: values,
-                backgroundColor: gradientDemo, // Use gradient
-                borderColor: '#38bdf8',
-                borderWidth: 3, 
-                borderRadius: 15, 
-                borderSkipped: false,
-            }]
-        };
-
-        const newChart = new Chart(ctx.canvas, {
-            type: 'bar',
-            data: chartData,
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { 
-                    legend: { display: false }, 
-                    title: { display: true, text: chartTitle, font: { size: 18, weight: 'bold', family: 'Inter' }, color: '#fff' }, // Light color for title
-                    tooltip: { 
-                        callbacks: { label: (c) => `Total Siswa: ${c.parsed.y}` },
-                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        borderColor: '#38bdf8',
-                        borderWidth: 1,
-                        boxPadding: 8,
-                        usePointStyle: true,
-                    } 
-                },
-                layout: {
-                    padding: { top: 10, bottom: 10 }
-                },
-                scales: {
-                    y: { 
-                        beginAtZero: true, 
-                        title: { display: true, text: 'Jumlah Siswa', font: { size: 14 }, color: '#e5e7eb' },
-                        ticks: { stepSize: 1, callback: (v) => Number.isInteger(v) ? v : null, font: { size: 13 }, color: '#e5e7eb' }, 
-                        grid: { drawBorder: false, color: 'rgba(255, 255, 255, 0.15)' } 
-                    },
-                    x: { 
-                        title: { display: true, text: 'Kelas/Jurusan', font: { size: 14 }, color: '#e5e7eb' },
-                        grid: { display: false },
-                        ticks: { font: { size: 13, weight: 'bold' }, color: '#e5e7eb' }
-                    }
-                }
-            },
-        });
-
-        comparisonChartInstanceClass = newChart;
-    }
-    
-    // NEW: Render chart untuk Kehadiran (Perbaikan 1)
-    function renderAttendanceComparisonChart(canvasId, data, filterType) {
-        const ctx = document.getElementById(canvasId).getContext('2d');
-
-        // FIX: Ensure previous instance is destroyed
-        if (comparisonChartInstanceMajor) comparisonChartInstanceMajor.destroy();
-        comparisonChartInstanceMajor = null;
-
-        // --- NEW: Dynamic Neon Gradient Colors for Stacked Bars ---
-        const createNeonGradient = (colorStart, colorEnd) => {
-            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-            gradient.addColorStop(0, colorStart);
-            gradient.addColorStop(1, colorEnd);
-            return gradient;
-        };
-
-        const colors = {
-            // Using brighter colors for visibility on dark glassmorphism
-            'Hadir': { bg: createNeonGradient('#34d399', '#059669'), border: '#34d399' },
-            'Izin': { bg: createNeonGradient('#fcd34d', '#d97706'), border: '#fcd34d' },
-            'Sakit': { bg: createNeonGradient('#f87171', '#dc2626'), border: '#f87171' },
-            'Alpha': { bg: createNeonGradient('#f43f5e', '#be123c'), border: '#f43f5e' } // PERBAIKAN: Merah Rose (Neon Red/Scarlet)
-        };
-        // --- END Gradient Logic ---
-
-        const labels = Object.keys(data); // Nama Kelas/Jurusan (or composite key)
-        const statuses = ['Hadir', 'Izin', 'Sakit', 'Alpha'];
-
-        const datasets = statuses.map(status => ({
-            label: status,
-            data: labels.map(label => data[label][status] || 0),
-            backgroundColor: colors[status].bg,
-            borderColor: colors[status].border,
-            borderWidth: 1,
-            stack: 'Stack 0', // Untuk membuat stacked bar
-            borderRadius: 5, // Added rounding
-            borderSkipped: false,
-        }));
-        
-        // Dynamic title based on filterType
-        let chartTitleAttend;
-        if (filterType === 'class') {
-            chartTitleAttend = 'Persentase Kehadiran per Kelas';
-        } else if (filterType === 'major') {
-            const gradeLevel = document.getElementById('comparison-grade-level').value;
-            chartTitleAttend = `Persentase Kehadiran per Jurusan & Tingkat (${gradeLevel || 'Semua Tingkat'})`;
-        }
-
-
-        const newChart = new Chart(ctx.canvas, {
-            type: 'bar',
-            data: { labels: labels, datasets: datasets },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: {
-                    title: { display: true, text: chartTitleAttend, font: { size: 18, weight: 'bold', family: 'Inter' }, color: '#fff' }, // UPDATED: uses local chartTitleAttend
-                    legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 14 }, color: '#e5e7eb' } },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        borderColor: '#7c3aed',
-                        borderWidth: 1,
-                        boxPadding: 8,
-                        callbacks: {
-                            label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(2)}%`, // Display percentage with 2 decimals
-                            title: (context) => `${context[0].label} (Total: ${data[context[0].label].TotalRecords} records)`
-                        }
-                    }
-                },
-                scales: {
-                    x: { 
-                        stacked: true, 
-                        grid: { display: false },
-                        ticks: { font: { size: 13, weight: 'bold' }, color: '#e5e7eb' } 
-                    },
-                    y: { 
-                        stacked: true, 
-                        beginAtZero: true, 
-                        max: 100, 
-                        title: { display: true, text: 'Persentase Kehadiran (%)', font: { size: 14 }, color: '#e5e7eb' },
-                        ticks: { 
-                            callback: function(value) { return value + '%'; }, // Add % to tick labels
-                            color: '#e5e7eb' 
-                        },
-                        grid: { color: 'rgba(255, 255, 255, 0.15)' }
-                    }
-                }
-            }
-        });
-
-        comparisonChartInstanceMajor = newChart;
-    }
-
-
-    async function displayRecap(kelas, jurusan, periode, resultsId, messageId, tableBodyId, canvasId, action) {
-        const resultsDiv = document.getElementById(resultsId);
-        const messageDiv = document.getElementById(messageId);
-        const tableBody = document.getElementById(tableBodyId);
-
-        resultsDiv.classList.add('hidden'); messageDiv.classList.remove('hidden');
-        // PERBAIKAN: Kontras dan Ukuran Loading Message
-        messageDiv.innerHTML = `<div class="flex flex-col justify-center items-center py-5">
-            <div class="animate-spin mb-4">
-                <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
-            </div>
-            <span class="text-white text-lg font-bold">Mengambil data rekap...</span>
-        </div>`;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-        tableBody.innerHTML = '';
-        
-        document.getElementById(`${canvasId}-summary`).innerHTML = '';
-
-        const url = `${WEB_APP_URL}?action=${action}&kelas=${kelas}&jurusan=${jurusan}&periode=${periode}&role=${currentUser.role}&nip=${currentUser.nip || ''}`;
-        const result = await fetchData(url);
-        
-        // Simpan Filter untuk Keperluan Cetak/Export
-        currentRecapFilters = {
-            kelas: kelas,
-            jurusan: jurusan,
-            periode: periode,
-            isTotalRecap: false
-        };
-        
-        if (result && result.status === 'success') {
-            const filteredRecords = result.records;
-            currentRecapData = filteredRecords;
-
-
-            if (filteredRecords.length === 0) {
-                messageDiv.innerHTML = `<p class="font-semibold text-white/90">Tidak ada data absensi yang ditemukan untuk filter ini.</p>`;
-                const currentInstance = (canvasId === 'recap-chart') ? recapChartInstance : adminRecapChartInstance;
-                if (currentInstance) currentInstance.destroy();
-                return;
-            }
-
-            const summary = filteredRecords.reduce((acc, record) => {
-                acc[record.status] = (acc[record.status] || 0) + 1;
-                return acc;
-            }, { 'Hadir': 0, 'Izin': 0, 'Sakit': 0, 'Alpha': 0 });
-            
-            summary['Total'] = filteredRecords.length;
-            renderRecapSummary(`${canvasId}-summary`, summary);
-            renderAttendanceChart(canvasId, summary, resultsId === 'recap-results');
-
-            let html = '';
-            filteredRecords.forEach((r, index) => {
-                let statusColor = '';
-                // PERBAIKAN: Warna Alpha menjadi merah menyala
-                if (r.status === 'Hadir') statusColor = 'text-emerald-300 bg-emerald-700/30';
-                else if (r.status === 'Izin') statusColor = 'text-amber-300 bg-amber-700/30';
-                else if (r.status === 'Sakit') statusColor = 'text-red-300 bg-red-700/30';
-                else if (r.status === 'Alpha') statusColor = 'text-rose-400 bg-rose-700/50 font-extrabold'; // Merah menyala dan Bold
-
-                const displayNama = r.nama || 'Nama Tidak Ditemukan (Cek Apps Script)'; 
-                const formattedTime = formatDateTime(r.date, r.time);
-
-
-                html += `
-                    <tr class="hover:bg-white/10">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-white/90">${index + 1}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/70">${r.nisn || '-'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/90">${displayNama}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/70">${r.kelas} / ${r.jurusan}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/70">${r.date} ${formattedTime}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColor}">${r.status}</span>
-                        </td>
-                        <td class="px-6 py-4 text-sm text-white/70 max-w-xs truncate">${r.keterangan || '-'}</td>
-                    </tr>
-                `;
-            });
-
-            tableBody.innerHTML = html;
-            messageDiv.classList.add('hidden');
-            resultsDiv.classList.remove('hidden');
-            
-            // Inject Print Header
-            const periodLabel = periode.charAt(0).toUpperCase() + periode.slice(1);
-            const printHeader = `
-                <div id="${resultsId}-print-header" class="mb-4 p-3 print-only">
-                    <h4 class="text-xl font-bold text-gray-800">Rekapitulasi Detail Absensi Siswa</h4>
-                    <p class="text-sm text-gray-600">
-                        Kelas: <span class="font-semibold">${kelas || 'Semua'}</span> | 
-                        Jurusan: <span class="font-semibold">${jurusan || 'Semua'}</span> | 
-                        Periode: <span class="font-semibold">${periodLabel}</span>
-                    </p>
-                    <p class="text-xs text-gray-500 mt-2">Dicetak pada: ${new Date().toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'})}</p>
-                </div>
-            `;
-            // Clear old header and insert new one
-            document.getElementById(resultsDiv.id).querySelectorAll('.print-only').forEach(el => el.remove());
-            resultsDiv.insertAdjacentHTML('afterbegin', printHeader);
-
-        } else {
-            messageDiv.innerHTML = `<p class="font-semibold text-red-400">${result ? result.message : 'Gagal memuat data rekap.'}</p>`;
-        }
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
-
-    // NEW FUNCTION: Display Total Recap
-    async function displayTotalRecap(kelas, jurusan, periode, startDate, endDate) {
-        const resultsDiv = document.getElementById('total-recap-results');
-        const messageDiv = document.getElementById('total-recap-message');
-        const tableBody = document.getElementById('total-recap-table-body');
-
-        resultsDiv.classList.add('hidden'); messageDiv.classList.remove('hidden');
-        // PERBAIKAN: Kontras dan Ukuran Loading Message
-        messageDiv.innerHTML = `<div class="flex flex-col justify-center items-center py-5">
-            <div class="animate-spin mb-4">
-                <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
-            </div>
-            <span class="text-white text-lg font-bold">Menghitung rekap total...</span>
-        </div>`;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-        tableBody.innerHTML = '';
-        currentTotalRecapData = [];
-
-        // Determine Action and URL Params
-        let action = 'getTotalRecap'; // Assuming Apps Script has this function
-        let url = `${WEB_APP_URL}?action=${action}&kelas=${kelas}&jurusan=${jurusan}&periode=${periode}&startDate=${startDate || ''}&endDate=${endDate || ''}&role=${currentUser.role}&nip=${currentUser.nip || ''}`;
-
-        const result = await fetchData(url);
-        
-        // Simpan Filter untuk Keperluan Cetak/Export
-        currentRecapFilters = {
-            kelas: kelas,
-            jurusan: jurusan,
-            periode: periode,
-            startDate: startDate,
-            endDate: endDate,
-            isTotalRecap: true
-        };
-        
-        if (result && result.status === 'success' && result.summary) {
-            currentTotalRecapData = result.summary;
-
-            if (currentTotalRecapData.length === 0) {
-                messageDiv.innerHTML = `<p class="font-semibold text-white/90">Tidak ada data absensi yang ditemukan dalam periode yang dipilih.</p>`;
-                return;
-            }
-
-            let html = '';
-            currentTotalRecapData.forEach((r, index) => {
-                const displayNama = r.nama || 'Nama Tidak Ditemukan'; 
-                const hadirCount = r.Hadir || 0;
-                const izinCount = r.Izin || 0;
-                const sakitCount = r.Sakit || 0;
-                const alphaCount = r.Alpha || 0;
-                
-                // PERBAIKAN: Warna data Alpha menjadi merah menyala
-                const alphaColorClass = alphaCount > 0 ? 'text-rose-400 font-extrabold' : 'text-red-300';
-
-                html += `
-                    <tr class="hover:bg-white/10">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-white/90">${index + 1}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/70">${r.nisn || '-'}</td>
-                        <td class="px-6 py-4 text-sm text-white/90 font-semibold">${displayNama}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-white/70">${r.kelas || '-'} / ${r.jurusan || '-'}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-300">${hadirCount}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-amber-300">${izinCount}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-300">${sakitCount}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold ${alphaColorClass}">${alphaCount}</td>
-                    </tr>
-                `;
-            });
-
-            tableBody.innerHTML = html;
-            messageDiv.classList.add('hidden');
-            resultsDiv.classList.remove('hidden');
-
-            // Inject Print Header
-            let periodText = '';
-            const periodeElement = document.getElementById('total-rekap-periode');
-            if (periode === 'custom' && startDate && endDate) {
-                // Formatting dates for display: YYYY-MM-DD to DD/MM/YYYY (approx)
-                const formattedStart = new Date(startDate).toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'});
-                const formattedEnd = new Date(endDate).toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'});
-                periodText = `Periode Khusus: ${formattedStart} s/d ${formattedEnd}`;
-            } else if (periode && periodeElement) {
-                const selectedOption = periodeElement.querySelector(`option[value="${periode}"]`);
-                const periodLabel = selectedOption ? selectedOption.textContent : periode.toUpperCase();
-                periodText = `Periode Cepat: ${periodLabel}`;
-            } else {
-                 periodText = 'Periode: Keseluruhan';
-            }
-
-            const printHeader = `
-                <div id="total-recap-results-print-header" class="mb-4 p-3 print-only">
-                    <h4 class="text-xl font-bold text-gray-800">Rekapitulasi Total Absensi Siswa</h4>
-                    <p class="text-sm text-gray-600">
-                        Kelas: <span class="font-semibold">${kelas || 'Semua'}</span> | 
-                        Jurusan: <span class="font-semibold">${jurusan || 'Semua'}</span> | 
-                        <span class="font-semibold">${periodText}</span>
-                    </p>
-                    <p class="text-xs text-gray-500 mt-2">Dicetak pada: ${new Date().toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'})}</p>
-                </div>
-            `;
-            
-            // Clear old header and insert new one
-            document.getElementById('total-recap-results').querySelectorAll('.print-only').forEach(el => el.remove());
-            resultsDiv.insertAdjacentHTML('afterbegin', printHeader);
-
-        } else {
-            const errorMsg = result ? result.message : 'Gagal memuat data rekap total. Pastikan fungsi Apps Script sudah di-redeploy.';
-            messageDiv.innerHTML = `<p class="font-semibold text-red-400">${errorMsg}</p>`;
-        }
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
-
-
-    // ====================================================================
     // --- 7. HANDLER & LISTENER FUNCTIONS (Logic Interaktif) ---
     // ====================================================================
-    
-    // --- Student Handlers ---
 
-    async function checkStudentAttendanceStatus() {
-        currentAttendanceRecord = null;
-        if (currentUser.role !== 'student') return;
+    // --- Camera/Photo Capture Logic ---
 
-        const url = `${WEB_APP_URL}?action=getStudentStatus&nisn=${currentUser.nisn}&date=${CURRENT_DATE_WIB}`;
-        const result = await fetchData(url);
+    function stopCamera() {
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
+            mediaStream = null;
+            if (videoElement) {
+                videoElement.srcObject = null;
+                // Optional cleanup for UI elements
+                videoElement.classList.add('hidden');
+                document.getElementById('video-fallback').classList.remove('hidden');
+            }
+        }
+    }
+
+    async function startCamera() {
+        // Assign elements to global variables inside this function as they are rendered dynamically
+        videoElement = document.getElementById('video-stream');
+        canvasElement = document.getElementById('photo-canvas');
+        photoDataInput = document.getElementById('photo-data');
+        photoPreview = document.getElementById('photo-preview');
+        captureButton = document.getElementById('capture-photo-btn');
+        const fallbackDiv = document.getElementById('video-fallback');
         
-        if (result && result.status === 'success') {
-            currentAttendanceRecord = result.record;
+        if (!videoElement || !canvasElement || !captureButton) return;
+
+        // Reset state
+        photoPreview.classList.add('hidden');
+        photoPreview.src = '';
+        photoDataInput.value = '';
+        captureButton.removeAttribute('disabled');
+        videoElement.classList.add('hidden');
+        fallbackDiv.classList.remove('hidden');
+        document.getElementById('photo-status').textContent = 'Tekan "Ambil Foto" untuk verifikasi wajah.';
+
+
+        try {
+            stopCamera(); // Ensure previous stream is stopped
+            
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: "user" // Use front camera
+                },
+                audio: false
+            });
+            
+            videoElement.srcObject = mediaStream;
+            videoElement.classList.remove('hidden');
+            fallbackDiv.classList.add('hidden');
+
+            // Wait for video metadata to load
+            await new Promise(resolve => {
+                videoElement.onloadedmetadata = () => {
+                    videoElement.play();
+                    resolve();
+                };
+            });
+
+            captureButton.onclick = capturePhoto;
+            
+        } catch (err) {
+            console.error("Error accessing camera: ", err);
+            videoElement.classList.add('hidden');
+            fallbackDiv.classList.remove('hidden');
+            fallbackDiv.innerHTML = '<span class="text-red-400">Gagal mengakses kamera. Harap izinkan akses.</span>';
+            captureButton.setAttribute('disabled', 'disabled');
+            document.getElementById('photo-status').innerHTML = '<span class="text-red-400 font-semibold">Kamera tidak aktif. Absensi tidak dapat dilanjutkan.</span>';
         }
     }
 
-    async function getStudentHistory() {
-        historyRecords = [];
-        if (currentUser.role !== 'student') return;
-
-        const url = `${WEB_APP_URL}?action=getStudentHistory&nisn=${currentUser.nisn}`;
-        const result = await fetchData(url);
-
-        if (result && result.status === 'success') {
-            historyRecords = result.records;
-        } else {
-             if (result && result.message && result.message.includes('Aksi tidak dikenali.')) {
-                 console.error(`Gagal memuat riwayat absensi: Aksi "getStudentHistory" tidak dikenali di Apps Script.`);
-                 showModal('Konfigurasi Server', 'Error: Aksi "getStudentHistory" tidak dikenali. Harap update Code.gs dan Redeploy Apps Script sebagai Versi Baru!', 'error', 7000);
-             } else {
-                console.error(`Gagal memuat riwayat absensi: ${result ? result.message : 'Unknown Error'}`);
-             }
+    function capturePhoto() {
+        if (!videoElement || !canvasElement || !mediaStream || captureButton.hasAttribute('disabled')) {
+            showModal('Kamera Belum Aktif', 'Harap tunggu kamera aktif, izinkan akses, atau refresh halaman.', 'error', 3000);
+            return;
         }
+
+        // Set canvas dimensions to video dimensions
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+
+        const ctx = canvasElement.getContext('2d');
+        ctx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+
+        // Convert canvas image to Base64 JPEG format (compressed for efficiency)
+        const base64Data = canvasElement.toDataURL('image/jpeg', 0.8); // 80% quality
+
+        // Update hidden input and preview
+        photoDataInput.value = base64Data;
+        photoPreview.src = base64Data;
+        photoPreview.classList.remove('hidden');
+        videoElement.classList.add('hidden');
+        document.getElementById('video-fallback').classList.add('hidden'); // Hide fallback just in case
+        
+        captureButton.setAttribute('disabled', 'disabled'); // Prevent re-capture until submission
+        document.getElementById('photo-status').innerHTML = '<span class="text-emerald-300 font-semibold">Foto berhasil diambil! Lanjutkan isi absensi.</span>';
     }
+    
+    // --- Student Handlers (Updated) ---
 
     function setupAttendanceFormListeners() {
         const form = document.getElementById('attendance-form');
         if (!form) return;
+        
+        // --- NEW: Camera Init ---
+        startCamera();
+        // --- END NEW: Camera Init ---
 
         const statusOptions = document.getElementById('status-options');
         const keteranganGroup = document.getElementById('keterangan-group');
@@ -2342,6 +2266,14 @@
         const form = e.target;
         const status = form.querySelector('input[name="status"]:checked').value;
         const keterangan = form.querySelector('#keterangan').value.trim();
+        
+        // --- NEW: Photo Data Validation ---
+        const photoData = document.getElementById('photo-data').value;
+        if (!photoData) {
+            showModal('Validasi Foto', 'Harap ambil foto kehadiran Anda terlebih dahulu.', 'error', 3000);
+            return;
+        }
+        // --- END NEW: Photo Data Validation ---
 
         showModal('Mengirim Data', 'Sedang mengirim data absensi Anda, mohon menunggu...', 'loading', 0);
 
@@ -2353,11 +2285,15 @@
             jurusan: currentUser.jurusan,
             status: status,
             keterangan: keterangan,
-            submittedBy: 'Siswa Mandiri'
+            submittedBy: 'Siswa Mandiri',
+            photo: photoData // --- NEW: Send photo data ---
         });
 
         const result = await postData(payload);
         hideModal(); 
+        
+        // Stop camera immediately after receiving response (regardless of success/fail)
+        stopCamera();
 
         if (result && result.status === 'success') {
             const submissionTime = getTimeString(new Date());
@@ -2598,7 +2534,7 @@
              if (result && result.message && result.message.includes('Aksi tidak dikenali.')) {
                  messageDiv.innerHTML = `<p class="font-semibold text-red-500">Error Server: Fungsi "getStudentListWithStatus" tidak ditemukan. Harap pastikan Anda telah menyimpan dan **REDEPLOY** Apps Script terbaru.</p>`;
              } else {
-                messageDiv.innerHTML = `<p class="font-semibold text-red-500">${result ? result.message : 'Gagal memuat data siswa (Error tidak terduga).'}</p>`;
+                 messageDiv.innerHTML = `<p class="font-semibold text-red-500">${result ? result.message : 'Gagal memuat data siswa (Error tidak terduga).'}</p>`;
              }
              return;
         }
@@ -2747,7 +2683,7 @@
             if (status === 'Hadir' || status === 'Alpha') {
                 keterangan = '-'; 
             } else if (keterangan === '') {
-                 // Wajib isi jika Izin/Sakit, tapi jika kosong, berikan feedback di Apps Script
+                // Wajib isi jika Izin/Sakit, tapi jika kosong, berikan feedback di Apps Script
                  keterangan = '-'; 
             }
 
@@ -2796,6 +2732,32 @@
     }
     
     // --- Teacher Assessment Handlers ---
+
+    function setupTeacherAssessmentListeners() {
+        const loadForm = document.getElementById('assessment-load-form');
+        const submitForm = document.getElementById('assessment-submit-form');
+        const assessmentType = document.getElementById('assessment-type');
+        const assessmentDateGroup = document.getElementById('assessment-date-group');
+        const tableBody = document.getElementById('assessment-student-list-body');
+        
+        if (!loadForm || !submitForm) return;
+
+        assessmentType.addEventListener('change', (e) => {
+            if (e.target.value === 'harian') {
+                assessmentDateGroup.classList.remove('hidden');
+                document.getElementById('assessment-score-label').textContent = 'Nilai (0-100)';
+            } else {
+                assessmentDateGroup.classList.add('hidden');
+                document.getElementById('assessment-score-label').textContent = 'Nilai Final (0-100)';
+            }
+        });
+
+        loadForm.addEventListener('submit', handleLoadAssessmentList);
+        submitForm.addEventListener('submit', handleSubmitAssessment);
+        
+        tableBody.removeEventListener('input', handleScoreInput);
+        tableBody.addEventListener('input', handleScoreInput); 
+    }
 
     async function handleLoadAssessmentList(e) {
         e.preventDefault();
@@ -2954,32 +2916,6 @@
         } else {
             hideMiniPopup();
         }
-    }
-
-    function setupTeacherAssessmentListeners() {
-        const loadForm = document.getElementById('assessment-load-form');
-        const submitForm = document.getElementById('assessment-submit-form');
-        const assessmentType = document.getElementById('assessment-type');
-        const assessmentDateGroup = document.getElementById('assessment-date-group');
-        const tableBody = document.getElementById('assessment-student-list-body');
-        
-        if (!loadForm || !submitForm) return;
-
-        assessmentType.addEventListener('change', (e) => {
-            if (e.target.value === 'harian') {
-                assessmentDateGroup.classList.remove('hidden');
-                document.getElementById('assessment-score-label').textContent = 'Nilai (0-100)';
-            } else {
-                assessmentDateGroup.classList.add('hidden');
-                document.getElementById('assessment-score-label').textContent = 'Nilai Final (0-100)';
-            }
-        });
-
-        loadForm.addEventListener('submit', handleLoadAssessmentList);
-        submitForm.addEventListener('submit', handleSubmitAssessment);
-        
-        tableBody.removeEventListener('input', handleScoreInput);
-        tableBody.addEventListener('input', handleScoreInput); 
     }
 
     async function handleSubmitAssessment(e) {
@@ -3157,7 +3093,7 @@
         tableBody.innerHTML = html;
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
-    
+
     // NEW: Fungsi untuk menghapus siswa (menggunakan showConfirm)
     function handleDeleteStudent(nisn, nama) {
         showConfirm(
@@ -3430,8 +3366,10 @@
         }
     }
 
-    
+
+    // ====================================================================
     // --- FINAL INITIALIZATION BLOCK ---
+    // ====================================================================
     
     // NEW: Login Form Handler moved here
     document.getElementById('login-form').addEventListener('submit', async function(e) {
@@ -3502,4 +3440,3 @@
 </script>
 </body>
 </html>
-
