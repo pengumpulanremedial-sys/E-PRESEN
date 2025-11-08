@@ -818,7 +818,8 @@
     // ====================================================================
 
     async function fetchData(endpointUrl) {
-        if (WEB_APP_URL === "" || WEB_APP_URL.includes("URL_APPS_SCRIPT_DISINI")) { // Hapus pengecekan yang salah
+        // PERBAIKAN STABILITAS: Pemeriksaan WEB_APP_URL
+        if (WEB_APP_URL === "" || WEB_APP_URL.includes("URL_APPS_SCRIPT_DISINI")) { 
             console.error("WEB_APP_URL belum diatur.");
             showModal('Error Konfigurasi', 'WEB_APP_URL harus diisi. Harap ganti placeholder "URL_APPS_SCRIPT_DISINI" dengan URL Web App Anda yang berakhiran /exec.', 'error', 5000);
             return null;
@@ -883,7 +884,8 @@
 
 
     async function postData(payload) {
-        if (WEB_APP_URL === "" || WEB_APP_URL.includes("URL_APPS_SCRIPT_DISINI")) { // Hapus pengecekan yang salah
+        // PERBAIKAN STABILITAS: Pemeriksaan WEB_APP_URL
+        if (WEB_APP_URL === "" || WEB_APP_URL.includes("URL_APPS_SCRIPT_DISINI")) { 
             showModal('Error Konfigurasi', 'WEB_APP_URL harus diisi. Harap ganti placeholder "URL_APPS_SCRIPT_DISINI" dengan URL Web App Anda yang berakhiran /exec.', 'error', 5000);
             return { status: 'error', message: 'WEB_APP_URL belum diatur.' };
         }
@@ -3330,6 +3332,7 @@
             
             // OPTIMIZATION: Use explicit integer conversion and robust checks
             const numericScore = parseInt(score);
+
             if (score === '' || isNaN(numericScore) || numericScore < 0 || numericScore > 100) {
                 hideMiniPopup();
                 return;
@@ -3806,6 +3809,13 @@
     document.getElementById('login-form').addEventListener('submit', async function(e) {
         e.preventDefault();
         
+        // PERBAIKAN STABILITAS: Pemeriksaan WEB_APP_URL sebelum mencoba login
+        if (WEB_APP_URL === "" || WEB_APP_URL.includes("URL_APPS_SCRIPT_DISINI")) {
+            document.getElementById('login-message').innerText = 'ERROR: URL Apps Script belum diatur atau salah format.';
+            document.getElementById('login-message').classList.remove('hidden');
+            return;
+        }
+
         if (!currentRole) {
             document.getElementById('login-message').innerText = 'Harap pilih peran Anda terlebih dahulu.';
             document.getElementById('login-message').classList.remove('hidden');
@@ -3876,4 +3886,3 @@
 </script>
 </body>
 </html>
-
