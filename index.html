@@ -497,6 +497,10 @@
     let comparisonChartInstanceClass = null; 
     let comparisonChartInstanceMajor = null; 
     let adminRecapChartInstance = null;
+    
+    // --- OPTIMIZATION 1: Pesan Error Generik untuk UX yang lebih mulus ---
+    const GENERIC_NETWORK_ERROR = 'Gagal terhubung ke server. Periksa URL Web App / Koneksi Jaringan Anda. Lihat console log untuk detail.';
+    // --- END OPTIMIZATION 1 ---
 
     // --- ROLE MAP ---
     const ROLE_MAP = {
@@ -807,7 +811,7 @@
 
 
     // ====================================================================
-    // --- 3. GAS COMMUNICATION FUNCTIONS --- (FIX BUG 1: Tambahkan Retry Logic)
+    // --- 3. GAS COMMUNICATION FUNCTIONS --- (OPTIMIZED)
     // ====================================================================
 
     async function fetchData(endpointUrl) {
@@ -829,13 +833,13 @@
                 
                 if (text.trim().startsWith('<')) {
                     // This error indicates a server crash or a redirection, often due to an invalid SPREADSHEET_ID in Apps Script.
-                    throw new Error('Apps Script Server Crash: Server mengembalikan kode HTML (bukan JSON/Text).');
+                    throw new Error('Apps Script Server Crash: Server mengembalikan kode HTML (bukan JSON/Text). Cek SPREADSHEET_ID di Apps Script.');
                 }
 
                 try {
                     const result = JSON.parse(text);
                     if (result.status === 'error' && result.message.includes('Aksi tidak dikenali.')) {
-                        const specificError = `Error: ${result.message} Anda perlu melakukan REDEPLOY ULANG Google Apps Script sebagai VERSI BARU setelah menambahkan kode fungsi terkait ke file Code.gs.`;
+                        const specificError = `Error: ${result.message} (Harap REDEPLOY ULANG Google Apps Script sebagai VERSI BARU).`;
                         throw new Error(specificError);
                     }
                     return result; // Success, break out of loop
@@ -855,10 +859,10 @@
                     await new Promise(resolve => setTimeout(resolve, (2 ** attempt) * 1000));
                 } else {
                     // Final attempt failed
-                    console.error('Fetch/CORS Error:', error);
-                    const errorMessage = `Gagal terhubung ke server Apps Script (Network/CORS Error) setelah ${MAX_RETRIES} kali percobaan. PASTIKAN: 1) URL /exec sudah benar, 2) Akses "Anyone" saat di-deploy, 3) Redeploy Versi Baru. Error Terakhir: ${error.message.substring(0, 100)}...`;
-                    showModal('Koneksi Gagal (Retry Failed)', errorMessage, 'error', 7000);
-                    return { status: 'error', message: errorMessage };
+                    console.error('Fetch/CORS Error (Final Fail):', error);
+                    // OPTIMIZATION: Use shorter error message for the modal
+                    showModal('Koneksi Gagal', GENERIC_NETWORK_ERROR, 'error', 7000);
+                    return { status: 'error', message: GENERIC_NETWORK_ERROR };
                 }
             }
         }
@@ -881,7 +885,7 @@
                 const text = await response.text();
                 
                 if (text.trim().startsWith('<')) {
-                    throw new Error('Apps Script Server Crash: Server mengembalikan kode HTML (bukan JSON/Text).');
+                    throw new Error('Apps Script Server Crash: Server mengembalikan kode HTML (bukan JSON/Text). Cek SPREADSHEET_ID di Apps Script.');
                 }
 
                 try {
@@ -903,10 +907,10 @@
                     await new Promise(resolve => setTimeout(resolve, (2 ** attempt) * 1000));
                 } else {
                     // Final attempt failed
-                    console.error('Fetch/CORS Error:', error);
-                    const errorMessage = `Gagal terhubung ke server Apps Script (Network/CORS Error) setelah ${MAX_RETRIES} kali percobaan. PASTIKAN: 1) URL /exec sudah benar, 2) Akses "Anyone" saat di-deploy, 3) Redeploy Versi Baru. Error Terakhir: ${error.message.substring(0, 100)}...`;
-                    showModal('Koneksi Gagal (Retry Failed)', errorMessage, 'error', 7000);
-                    return { status: 'error', message: errorMessage };
+                    console.error('Fetch/CORS Error (Final Fail):', error);
+                    // OPTIMIZATION: Use shorter error message for the modal
+                    showModal('Koneksi Gagal', GENERIC_NETWORK_ERROR, 'error', 7000);
+                    return { status: 'error', message: GENERIC_NETWORK_ERROR };
                 }
             }
         }
@@ -2048,7 +2052,7 @@
             </div>
             
             <div id="manual-attendance-area" class="mt-8">
-                            <p id="manual-message" class="text-center text-white/70 py-10">Pilih Kelas, Jurusan, dan Tanggal untuk memuat daftar siswa.</p>
+                                <p id="manual-message" class="text-center text-white/70 py-10">Pilih Kelas, Jurusan, dan Tanggal untuk memuat daftar siswa.</p>
                             
                             <!-- Student List Table (will be populated dynamically) -->
                             <form id="manual-attendance-submit-form" class="hidden">
@@ -2294,7 +2298,7 @@
                         </tbody>
                     </table>
                 </div>
-                                     <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
+                                             <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
                         <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Perubahan Data Massal
                     </button>
             </form>
@@ -2554,8 +2558,8 @@
             resultsDiv.classList.remove('hidden');
 
         } else {
-            // FIX for "Gagal memuat rekap. undefined"
-            const errorMessage = result ? (result.message || 'Error tidak terduga dari server Apps Script. Pastikan fungsi Apps Script **getRecap** sudah di-redeploy.') : 'Gagal terhubung ke server Apps Script. Periksa koneksi atau konfigurasi URL.';
+            // OPTIMIZATION: Use generic network error message if API fails silently or with generic message
+            const errorMessage = (result && result.message) ? result.message : GENERIC_NETWORK_ERROR;
             messageDiv.innerHTML = `<p class="font-semibold text-red-400">Gagal memuat rekap. ${errorMessage}</p>`;
             currentRecapData = []; // Clear data on failure
             currentRecapFilters = {}; // Clear filters
@@ -2628,8 +2632,8 @@
             resultsDiv.classList.remove('hidden');
 
         } else {
-            // FIX for "Gagal memuat rekap. undefined"
-            const errorMessage = result ? (result.message || 'Error tidak terduga dari server Apps Script. Pastikan fungsi Apps Script **getTotalRecap** sudah di-redeploy.') : 'Gagal terhubung ke server Apps Script. Periksa koneksi atau konfigurasi URL.';
+            // OPTIMIZATION: Use generic network error message if API fails silently or with generic message
+            const errorMessage = (result && result.message) ? result.message : GENERIC_NETWORK_ERROR;
             messageDiv.innerHTML = `<p class="font-semibold text-red-400">Gagal memuat rekap total. ${errorMessage}</p>`;
             currentTotalRecapData = []; // Clear data on failure
             currentRecapFilters = {}; // Clear filters
@@ -2739,7 +2743,9 @@
         const result = await fetchData(url);
 
         if (!result || result.status !== 'success' || !result.demographic || !result.attendance_percent) {
-            messageDiv.innerHTML = `<p class="font-semibold text-red-400">${result ? (result.message || 'Gagal memuat data perbandingan. Pastikan fungsi Apps Script **getComparisonData** sudah di-redeploy.') : 'Gagal memuat data perbandingan (Error Koneksi/Server).'}</p>`;
+            // OPTIMIZATION: Use generic network error message if API fails silently or with generic message
+            const errorMessage = (result && result.message) ? result.message : GENERIC_NETWORK_ERROR;
+            messageDiv.innerHTML = `<p class="font-semibold text-red-400">${errorMessage}</p>`;
             return;
         }
 
@@ -2811,8 +2817,9 @@
         if (result && result.status === 'success' && result.photos) {
             renderPhotoGrid(result.photos);
         } else {
-            const msg = result ? result.message : 'Gagal memuat data foto.';
-            messageDiv.innerHTML = `<p class="font-semibold text-red-400">Error: ${msg}. Pastikan fungsi Apps Script **getAttendancePhotos** sudah di-redeploy.</p>`;
+            // OPTIMIZATION: Use generic network error message if API fails silently or with generic message
+            const msg = (result && result.message) ? result.message : GENERIC_NETWORK_ERROR;
+            messageDiv.innerHTML = `<p class="font-semibold text-red-400">Error: ${msg}</p>`;
         }
     }
 
@@ -2909,12 +2916,10 @@
         if (result && result.status === 'success' && result.students) {
             studentListWithStatus = result.students;
         } else {
-             if (result && result.message && result.message.includes('Aksi tidak dikenali.')) {
-                 messageDiv.innerHTML = `<p class="font-semibold text-red-500">Error Server: Fungsi "getStudentListWithStatus" tidak ditemukan. Harap pastikan Anda telah menyimpan dan **REDEPLOY** Apps Script terbaru.</p>`;
-             } else {
-                 messageDiv.innerHTML = `<p class="font-semibold text-red-500">${result ? result.message : 'Gagal memuat data siswa (Error tidak terduga).'}</p>`;
-             }
-             return;
+            // OPTIMIZATION: Use generic network error message if API fails silently or with generic message
+            const errorMessage = (result && result.message) ? result.message : GENERIC_NETWORK_ERROR;
+            messageDiv.innerHTML = `<p class="font-semibold text-red-500">Error: ${errorMessage}</p>`;
+            return;
         }
 
         renderStudentAttendanceTable(studentListWithStatus, kelas, jurusan, date);
@@ -3173,8 +3178,9 @@
         if (result && result.status === 'success' && result.students) {
             studentListWithScores = result.students;
         } else {
-            const msg = result ? result.message : 'Gagal memuat data penilaian.';
-            messageDiv.innerHTML = `<p class="font-semibold text-red-500">Error: ${msg}. Pastikan Sheet 'DATA NILAI' dan 'NILAI HARIAN' sudah benar dan skrip Apps Script sudah **REDEPLOY**.</p>`;
+            // OPTIMIZATION: Use generic network error message if API fails silently or with generic message
+            const msg = (result && result.message) ? result.message : GENERIC_NETWORK_ERROR;
+            messageDiv.innerHTML = `<p class="font-semibold text-red-500">Error: ${msg}</p>`;
             return;
         }
 
@@ -3236,7 +3242,9 @@
         const scoreInput = form.querySelector(`input[name="score_${nisn}"]`);
         const score = scoreInput.value.trim();
         
-        if (score === '' || parseInt(score) < 0 || parseInt(score) > 100) {
+        // OPTIMIZATION: Use explicit integer conversion and robust checks
+        const numericScore = parseInt(score);
+        if (score === '' || isNaN(numericScore) || numericScore < 0 || numericScore > 100) {
              showModal('Validasi Nilai', `Nilai harus antara 0 dan 100.`, 'error', 3000);
              return;
         }
@@ -3246,7 +3254,7 @@
             nama: form.querySelector(`input[name="nama_${nisn}"]`).value,
             kelas: form.querySelector(`input[name="kelas_${nisn}"]`).value,
             jurusan: form.querySelector(`input[name="jurusan_${nisn}"]`).value,
-            score: score,
+            score: numericScore, // Use numeric score
         }];
         
         showModal('Mengirim Data', `Menyimpan nilai ${type.toUpperCase()} untuk NISN ${nisn} secara individual...`, 'loading', 0);
@@ -3284,8 +3292,9 @@
         if (e.target.tagName.toLowerCase() === 'input' && e.target.name.startsWith('score_')) {
             const score = e.target.value.trim();
             
-            // Validasi nilai
-            if (score === '' || parseInt(score) < 0 || parseInt(score) > 100) {
+            // OPTIMIZATION: Use explicit integer conversion and robust checks
+            const numericScore = parseInt(score);
+            if (score === '' || isNaN(numericScore) || numericScore < 0 || numericScore > 100) {
                 hideMiniPopup();
                 return;
             }
@@ -3311,13 +3320,16 @@
             const scoreInput = form.querySelector(`input[name="score_${nisn}"]`);
             const score = scoreInput.value.trim();
             
-            if (score !== '' && parseInt(score) >= 0 && parseInt(score) <= 100) {
+            // OPTIMIZATION: Use explicit integer conversion and robust checks
+            const numericScore = parseInt(score);
+
+            if (score !== '' && !isNaN(numericScore) && numericScore >= 0 && numericScore <= 100) {
                 updates.push({ 
                     nisn: nisn, 
                     nama: form.querySelector(`input[name="nama_${nisn}"]`).value,
                     kelas: form.querySelector(`input[name="kelas_${nisn}"]`).value,
                     jurusan: form.querySelector(`input[name="jurusan_${nisn}"]`).value,
-                    score: score,
+                    score: numericScore,
                 });
             } else if (score !== '') {
                     // Beri tahu user jika ada nilai tidak valid
@@ -3394,7 +3406,9 @@
                 allStudentsData = result.students;
             } else {
                 console.error("Gagal memuat semua data siswa:", result);
-                messageDiv.innerHTML = `<p class="font-semibold text-red-500">Gagal memuat semua data siswa. Pastikan fungsi 'getAllStudents' sudah di-redeploy di Apps Script.</p>`;
+                // OPTIMIZATION: Use generic network error message if API fails silently or with generic message
+                const errorMessage = (result && result.message) ? result.message : GENERIC_NETWORK_ERROR;
+                messageDiv.innerHTML = `<p class="font-semibold text-red-500">Gagal memuat semua data siswa. ${errorMessage}</p>`;
                 if (bulkDeleteBtn) bulkDeleteBtn.setAttribute('disabled', 'disabled'); 
                 filteredCountSpan.textContent = '0';
                 return;
