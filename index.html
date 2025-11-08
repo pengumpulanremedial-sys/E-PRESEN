@@ -140,7 +140,8 @@
             header, nav, .flex.justify-end, .page:not(#dashboard-container), 
             h2, .bg-purple-50, .bg-indigo-50, #modal-message, #mini-popup, #dashboard-tabs, 
             .print-hidden, #recap-results > div:nth-child(1), #admin-recap-results > div:nth-child(1), 
-            #teacher-recap-form, #admin-recap-form, #total-recap-form, #total-recap-message {
+            #teacher-recap-form, #admin-recap-form, #total-recap-form, #total-recap-message,
+            #photo-dashboard-form, #photo-dashboard-message { /* <--- NEW: Hide photo dashboard filters */
                 display: none !important;
             }
             
@@ -195,6 +196,35 @@
                 border: none !important;
                 color: #000; /* Pastikan teks berwarna hitam */
             }
+
+            /* NEW: Photo Grid Print Settings (to print as list or large grid) */
+            #photo-dashboard-results {
+                display: block !important;
+                padding: 10px;
+                border: 1px solid #ccc;
+            }
+            #photo-grid-container {
+                display: block !important;
+                column-count: 2; /* Print in two columns */
+                column-gap: 15px;
+            }
+            .glass-element.rounded-xl.overflow-hidden {
+                display: inline-block;
+                width: 100%;
+                margin-bottom: 15px;
+                break-inside: avoid;
+                box-shadow: none !important;
+                border: 1px solid #ccc !important;
+                color: black !important;
+                background-color: white !important;
+            }
+            .glass-element.rounded-xl.overflow-hidden * {
+                color: black !important;
+            }
+            .glass-element.rounded-xl.overflow-hidden img {
+                border: 1px solid #eee;
+            }
+
 
             /* --- SKEMA LEBAR KOLOM BARU YANG LEBIH DINAMIS --- */
             /* Skema untuk Detail Harian */
@@ -434,7 +464,7 @@
 
     const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1F72NOuTyeDYePeu5nLk_oLrvjecx-5iLCxj3cO57l1Y/edit";
     // GANTI URL INI DENGAN URL WEB APP DEPLOYMENT GOOGLE APPS SCRIPT ANDA!
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbw17CezqtHpbmFMMPao-O0dgQJtDFLsvMve5rCPElcfAOmzimraj7ssHyWUqTjz_56i/exec"; 
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzPg5mP0nt21c2c_OBkZpi02NusNVwtUAqdBkyMxj8CKt6WGk-IPcTsy3TI-6mPysI1U/exec"; 
     
     let currentUser = null;
     let currentTab = '';
@@ -484,6 +514,7 @@
             { id: 'rekap-guru', label: 'Rekap Detail Harian', icon: 'file-text' }, // Existing Detail Recap
             { id: 'rekap-total', label: 'Rekap Total Absen', icon: 'bar-chart-2' }, // NEW Total Recap
             { id: 'dashboard-grafik', label: 'Dashboard Grafik', icon: 'bar-chart-3' }, // RENAMED
+            { id: 'dashboard-foto', label: 'Dashboard Foto Absensi', icon: 'image' }, // <--- NEW TAB FOR PHOTOS
             { id: 'absensi-siswa', label: 'Absensi Manual Siswa', icon: 'calendar-check' }, 
             { id: 'penilaian', label: 'Input Penilaian', icon: 'file-plus' },
             { id: 'profil', label: 'Profil Saya', icon: 'user' },
@@ -979,6 +1010,11 @@
                 contentDiv.innerHTML = renderTeacherComparison();
                 setupTeacherComparisonListeners(); 
                 break;
+            // NEW CASE: Dashboard Foto Absensi
+            case 'dashboard-foto': 
+                contentDiv.innerHTML = renderTeacherPhotoDashboard();
+                setupTeacherPhotoDashboardListeners();
+                break;
             case 'absensi-siswa':
                 contentDiv.innerHTML = renderTeacherStudentAttendance();
                 setupTeacherStudentAttendanceListeners(); 
@@ -1308,6 +1344,8 @@
                         borderWidth: 1,
                         boxPadding: 8,
                         usePointStyle: true,
+                        // NEW: Custom hover effect
+                        caretPadding: 10,
                     } 
                 },
                 layout: {
@@ -1846,6 +1884,58 @@
         `;
     }
 
+    // NEW FUNCTION: Render Photo Dashboard
+    function renderTeacherPhotoDashboard() {
+        const allClasses = currentUser.kelasAjar || [];
+        const allMajors = currentUser.jurusanAjar || [];
+        const currentDate = new Date().toISOString().split('T')[0];
+
+        return `
+            <h3 class="text-2xl font-bold text-white mb-6 flex items-center"><span data-lucide="image" class="w-6 h-6 mr-2"></span> Dashboard Foto Absensi Siswa</h3>
+            <p class="text-white/90 mb-6">Tampilkan foto kehadiran siswa berdasarkan filter waktu, kelas, dan jurusan.</p>
+            
+            <div id="photo-dashboard-form" class="glass-element p-5 rounded-lg shadow-inner mb-6 print-hidden">
+                <form id="photo-dashboard-filter-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div>
+                        <label for="photo-date" class="block text-sm font-medium text-white/90">Tanggal Foto</label>
+                        <input type="date" id="photo-date" value="${currentDate}" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
+                    </div>
+                    <div>
+                        <label for="photo-kelas" class="block text-sm font-medium text-white/90">Kelas</label>
+                        <select id="photo-kelas" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
+                            <option value="" class="bg-indigo-700">-- Semua Kelas --</option>
+                            ${allClasses.map(c => `<option value="${c}" class="bg-indigo-700">${c}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="photo-jurusan" class="block text-sm font-medium text-white/90">Jurusan</label>
+                        <select id="photo-jurusan" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
+                            <option value="" class="bg-indigo-700">-- Semua Jurusan --</option>
+                            ${allMajors.map(j => `<option value="${j}" class="bg-indigo-700">${j}</option>`).join('')}
+                        </select>
+                    </div>
+                    <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
+                        <span data-lucide="search" class="w-4 h-4 mr-2"></span> Tampilkan Foto
+                    </button>
+                </form>
+                <div class="flex justify-end mt-4">
+                     <button onclick="window.print()" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg flex items-center transition duration-200 modern-hover">
+                        <span data-lucide="printer" class="w-4 h-4 mr-2"></span> Cetak Galeri
+                    </button>
+                </div>
+            </div>
+
+            <div id="photo-dashboard-results" class="space-y-6">
+                <p id="photo-dashboard-message" class="text-center text-white/70 py-10">Pilih filter dan tekan "Tampilkan Foto" untuk memuat galeri kehadiran.</p>
+                
+                <div id="photo-grid-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <!-- Photo Cards will be inserted here -->
+                </div>
+                
+            </div>
+        `;
+    }
+
     function renderTeacherStudentAttendance() {
         const currentDate = new Date().toISOString().split('T')[0];
 
@@ -2090,21 +2180,21 @@
             <p id="admin-management-message" class="text-center text-white/70 py-10">Memuat data siswa...</p>
             
             <form id="admin-student-update-form" class="hidden">
-                                 <div class="flex flex-col space-y-3 md:flex-row justify-between items-center mb-4 md:space-y-0 print-hidden">
-                                 <button type="button" onclick="openAddStudentModal()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center transition duration-200 modern-hover">
-                                     <span data-lucide="user-plus" class="w-4 h-4 mr-2"></span> Tambah Siswa Baru
+                             <div class="flex flex-col space-y-3 md:flex-row justify-between items-center mb-4 md:space-y-0 print-hidden">
+                             <button type="button" onclick="openAddStudentModal()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center transition duration-200 modern-hover">
+                                 <span data-lucide="user-plus" class="w-4 h-4 mr-2"></span> Tambah Siswa Baru
+                             </button>
+                             
+                             <div class="flex space-x-3 w-full md:w-auto">
+                                 <button onclick="openGoogleSheetLink()" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center transition duration-200 modern-hover">
+                                     <span data-lucide="external-link" class="w-4 h-4 mr-2"></span> Edit Data di Sheet
                                  </button>
-                                 
-                                 <div class="flex space-x-3 w-full md:w-auto">
-                                     <button onclick="openGoogleSheetLink()" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center transition duration-200 modern-hover">
-                                         <span data-lucide="external-link" class="w-4 h-4 mr-2"></span> Edit Data di Sheet
-                                     </button>
-                                     <!-- NEW BULK DELETE BUTTON (Perbaikan 3) -->
-                                     <button onclick="handleDeleteFilteredStudents()" type="button" id="bulk-delete-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center disabled:opacity-50" disabled>
-                                         <span data-lucide="trash-2" class="w-4 h-4 mr-2"></span> Hapus Berdasarkan Filter (<span id="filtered-count">0</span>)
-                                     </button>
-                                 </div>
-                                 </div>
+                                 <!-- NEW BULK DELETE BUTTON (Perbaikan 3) -->
+                                 <button onclick="handleDeleteFilteredStudents()" type="button" id="bulk-delete-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center disabled:opacity-50" disabled>
+                                     <span data-lucide="trash-2" class="w-4 h-4 mr-2"></span> Hapus Berdasarkan Filter (<span id="filtered-count">0</span>)
+                                 </button>
+                             </div>
+                             </div>
 
                 <div id="admin-student-list-container" class="overflow-x-auto rounded-lg shadow-lg border border-white/30 mb-6">
                     <table class="min-w-full divide-y divide-white/20">
@@ -2124,7 +2214,7 @@
                         </tbody>
                     </table>
                 </div>
-                                 <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
+                                     <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
                         <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Perubahan Data Massal
                     </button>
             </form>
@@ -2481,6 +2571,102 @@
 
             displayRecap(kelas, jurusan, periode, 'recap-results', 'recap-message', 'recap-table-body', 'recap-chart', 'getRecap');
         });
+    }
+
+    // NEW HANDLER: Teacher Photo Dashboard
+    function setupTeacherPhotoDashboardListeners() {
+        const form = document.getElementById('photo-dashboard-filter-form');
+        if (form) {
+            form.addEventListener('submit', handleLoadPhotos);
+        }
+    }
+    
+    // NEW FUNCTION: Handle Load Photos
+    async function handleLoadPhotos(e) {
+        e.preventDefault();
+        const date = document.getElementById('photo-date').value;
+        const kelas = document.getElementById('photo-kelas').value;
+        const jurusan = document.getElementById('photo-jurusan').value;
+        const messageDiv = document.getElementById('photo-dashboard-message');
+        const gridContainer = document.getElementById('photo-grid-container');
+
+        messageDiv.classList.remove('hidden');
+        gridContainer.innerHTML = '';
+        
+        if (!date) {
+            messageDiv.innerHTML = `<p class="font-semibold text-red-500">Harap masukkan Tanggal Foto yang valid.</p>`;
+            return;
+        }
+
+        messageDiv.innerHTML = `<div class="flex flex-col justify-center items-center py-5">
+            <div class="animate-spin mb-4">
+                <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
+            </div>
+            <span class="text-white text-lg font-bold">Memuat galeri foto absensi untuk ${date}...</span>
+        </div>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        const url = `${WEB_APP_URL}?action=getAttendancePhotos&date=${date}&kelas=${kelas}&jurusan=${jurusan}`;
+        const result = await fetchData(url);
+
+        if (result && result.status === 'success' && result.photos) {
+            const photoRecords = result.photos;
+
+            if (photoRecords.length === 0) {
+                messageDiv.innerHTML = `<p class="font-semibold text-white/90">Tidak ditemukan foto absensi untuk tanggal dan filter yang dipilih.</p>`;
+            } else {
+                messageDiv.classList.add('hidden');
+                renderPhotoGrid(photoRecords);
+            }
+
+        } else {
+            const msg = result ? result.message : 'Gagal memuat foto.';
+            messageDiv.innerHTML = `<p class="font-semibold text-red-500">Error: ${msg}. Pastikan fungsi Apps Script **getAttendancePhotos** sudah di-redeploy.</p>`;
+        }
+    }
+
+    // NEW FUNCTION: Render Photo Grid
+    function renderPhotoGrid(photos) {
+        const gridContainer = document.getElementById('photo-grid-container');
+        gridContainer.innerHTML = ''; // Clear previous content
+
+        photos.forEach(photo => {
+            let statusClass = '';
+            // Match color scheme for status
+            if (photo.status === 'Hadir') statusClass = 'text-emerald-300 border-emerald-500';
+            else if (photo.status === 'Izin') statusClass = 'text-amber-300 border-amber-500';
+            else if (photo.status === 'Sakit') statusClass = 'text-red-300 border-red-500';
+            else if (photo.status === 'Alpha') statusClass = 'text-rose-400 border-rose-500';
+
+            const photoCard = document.createElement('div');
+            // Elegant photo card design
+            photoCard.className = `glass-element rounded-xl overflow-hidden shadow-2xl modern-hover transition duration-300 border border-white/30`;
+            
+            photoCard.innerHTML = `
+                <div class="h-48 w-full bg-gray-900 overflow-hidden">
+                    <img src="${photo.photo || 'https://placehold.co/400x300/111827/9ca3af?text=NO+PHOTO+DATA'}" 
+                         alt="Absensi ${photo.nama}" 
+                         class="w-full h-full object-cover transform hover:scale-110 transition duration-500 cursor-zoom-in"
+                         onclick="showModal('Foto Kehadiran: ${photo.nama}', '<img src=\\'${photo.photo || 'https://placehold.co/800x600/111827/9ca3af?text=NO+PHOTO+DATA'}\\' class=\\'w-full h-auto rounded-lg shadow-xl\\'>', 'info', 0, 'image')">
+                </div>
+                <div class="p-4 space-y-1">
+                    <p class="text-lg font-bold text-white truncate">${photo.nama}</p>
+                    <p class="text-sm font-medium text-white/70">NISN: ${photo.nisn}</p>
+                    <p class="text-sm text-white/80">${photo.kelas || '-'}/${photo.jurusan || '-'} - ${photo.date}</p>
+                    <div class="flex justify-between items-center pt-2 border-t border-white/10">
+                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-white/10 ${statusClass}">
+                            ${photo.status || 'T/A'}
+                        </span>
+                        <span class="text-xs text-white/60 flex items-center">
+                            <span data-lucide="clock" class="w-3 h-3 mr-1"></span> ${photo.time || '--:--'} WIB
+                        </span>
+                    </div>
+                </div>
+            `;
+            gridContainer.appendChild(photoCard);
+        });
+
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     // NEW HANDLER: Teacher Total Recap
@@ -3605,5 +3791,3 @@
 </script>
 </body>
 </html>
-
-
