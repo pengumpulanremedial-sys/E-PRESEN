@@ -767,7 +767,7 @@
     // ====================================================================
 
     async function fetchData(endpointUrl) {
-        if (WEB_APP_URL.trim() === "" || WEB_APP_URL.includes("AKfycbzPg5mP0nt21c2_OBkZpi02NusNVwtUAqdBkyMxj8CKt6WGk-IPcTsy3TI-6mPysI1U")) {
+        if (WEB_APP_URL.trim() === "" || WEB_APP_URL.includes("https://script.google.com/macros/s/AKfycbw17CezqtHpbmFMMPao-O0dgQJtDFLsvMve5rCPElcfAOmzimraj7ssHyWUqTjz_56i/exec")) {
              // NEW: Error Handling untuk URL yang belum diganti
              const errorMessage = `WEB_APP_URL is not defined or using placeholder. Harap ganti placeholder dengan URL Apps Script /exec yang benar.`;
              console.error(errorMessage);
@@ -823,7 +823,7 @@
 
 
     async function postData(payload) {
-        if (WEB_APP_URL.trim() === "" || WEB_APP_URL.includes("AKfycbzPg5mP0nt21c2_OBkZpi02NusNVwtUAqdBkyMxj8CKt6WGk-IPcTsy3TI-6mPysI1U")) {
+        if (WEB_APP_URL.trim() === "" || WEB_APP_URL.includes("https://script.google.com/macros/s/AKfycbw17CezqtHpbmFMMPao-O0dgQJtDFLsvMve5rCPElcfAOmzimraj7ssHyWUqTjz_56i/exec")) {
             // NEW: Error Handling untuk URL yang belum diganti
             const errorMessage = `WEB_APP_URL is not defined or using placeholder. Harap ganti placeholder dengan URL Apps Script /exec yang benar.`;
             console.error(errorMessage);
@@ -2597,7 +2597,12 @@
             }
         } else {
             const msg = result ? (result.message || 'Error tidak terduga dari server Apps Script. Pastikan fungsi Apps Script **getAttendancePhotos** sudah di-redeploy.') : 'Gagal memuat data foto (Error Koneksi/Server).';
-            messageDiv.innerHTML = `<p class="font-semibold text-red-500">Gagal memuat foto: ${msg}</p>`;
+            // PENTING: Jika error adalah WEB_APP_URL is not defined, kita tampilkan pesan yang lebih jelas
+            if (msg.includes('WEB_APP_URL is not defined')) {
+                 messageDiv.innerHTML = `<p class="font-semibold text-red-500">KONFIGURASI ERROR: Harap ganti "YOUR_WEB_APP_URL_HERE" di baris 39 file index.html dengan URL Apps Script /exec yang benar dan coba lagi.</p>`;
+            } else {
+                 messageDiv.innerHTML = `<p class="font-semibold text-red-500">Gagal memuat foto: ${msg}</p>`;
+            }
         }
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
@@ -3754,9 +3759,3 @@
 </script>
 </body>
 </html>
-
-
-
-
-
-
