@@ -897,7 +897,7 @@
                     throw new Error('Respon POST tidak terduga, bukan JSON: ' + text);
                 }
             } catch (error) {
-                 if (attempt < MAX_RETRIES - 1) {
+                if (attempt < MAX_RETRIES - 1) {
                     console.warn(`Fetch POST attempt ${attempt + 1} failed. Retrying in ${2 ** attempt}s...`, error);
                     // Implement exponential backoff
                     await new Promise(resolve => setTimeout(resolve, (2 ** attempt) * 1000));
@@ -1476,7 +1476,7 @@
                         grid: { color: 'rgba(255, 255, 255, 0.15)' }
                     }
                 }
-            }
+            },
         });
 
         comparisonChartInstanceMajor = newChart;
@@ -1986,28 +1986,32 @@
             grid.appendChild(card);
         });
     }
-    
+
     function showPhotoModal(nama, photoUrl, nisn, kelasJurusan, date, time) {
         let photoBody;
 
-        // Tentukan URL yang akan digunakan, gunakan placeholder khusus untuk modal jika URL utama bermasalah
-        const modalPhotoUrl = photoUrl && (photoUrl.startsWith('http') || photoUrl.startsWith('https')) 
-            ? photoUrl 
-            : 'https://placehold.co/500x400/CC0000/ffffff?text=URL+TIDAK+VALID';
+        if (photoUrl && (photoUrl.startsWith('http') || photoUrl.startsWith('https'))) {
+            // PERBAIKAN: Memastikan tag <img> dirender di dalam modal
+            photoBody = `
+                <img src="${photoUrl}" 
+                    onerror="this.onerror=null; this.src='https://placehold.co/500x400/4f46e5/ffffff?text=FOTO+Gagal+Dimuat';"
+                    class="w-full h-auto rounded-lg shadow-xl mb-4" 
+                    alt="Foto Kehadiran ${nama}">
+                <div class="text-left text-sm text-gray-700 space-y-1">
+                    <p><strong>Status:</strong> ${date} | ${time} WIB</p>
+                    <p><strong>NISN:</strong> ${nisn}</p>
+                    <p><strong>Kelas/Jurusan:</strong> ${kelasJurusan}</p>
+                </div>
+                <button onclick="hideModal()" class="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-200">Tutup</button>
+            `;
+        } else {
+            photoBody = `
+                <p class="text-red-500 font-semibold mb-4">URL Foto Tidak Valid:</p>
+                <p class="text-gray-600 break-words">${photoUrl || 'URL Kosong'}</p>
+                <button onclick="hideModal()" class="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-200">Tutup</button>
+            `;
+        }
 
-        // Konten modal dengan mekanisme id unik untuk memicu reload
-        photoBody = `
-            <img id="modal-photo-${nisn}" src="${modalPhotoUrl}" 
-                onerror="this.onerror=null; this.src='https://placehold.co/500x400/4f46e5/ffffff?text=FOTO+Gagal+Dimuat';"
-                class="w-full h-auto rounded-lg shadow-xl mb-4" 
-                alt="Foto Kehadiran ${nama}">
-            <div class="text-left text-sm text-gray-700 space-y-1">
-                <p><strong>Status:</strong> ${date} | ${time} WIB</p>
-                <p><strong>NISN:</strong> ${nisn}</p>
-                <p><strong>Kelas/Jurusan:</strong> ${kelasJurusan}</p>
-            </div>
-            <button onclick="hideModal()" class="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-200">Tutup</button>
-        `;
 
         showModal(`Foto Kehadiran: ${nama}`, photoBody, 'image');
     }
@@ -2166,7 +2170,7 @@
                 <h4 class="text-lg font-bold text-white">Opsi Alternatif: Logo Base64</h4>
                 <div>
                     <label for="config-logo-base64" class="block text-sm font-medium text-white/90">Tempel String Base64 Gambar</label>
-                    <textarea id="config-logo-base64" rows="3" placeholder="Contoh: data:image/png;base64,iVBORw0KGgoAAAAN..." class="w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 resize-none glass-element"></textarea>
+                    <textarea id="config-logo-base64" rows="3" placeholder="Contoh: data:image/png;base64,iVBORw0goAAAAN..." class="w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 resize-none glass-element"></textarea>
                 </div>
                 <button id="apply-base64-btn" type="button" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center transition duration-200 modern-hover">
                     <span data-lucide="image" class="w-4 h-4 mr-2"></span> Terapkan Logo dari Base64
@@ -2290,7 +2294,7 @@
                         </tbody>
                     </table>
                 </div>
-                                             <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
+                                     <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
                         <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Perubahan Data Massal
                     </button>
             </form>
@@ -2688,8 +2692,8 @@
                     isValid = false;
                 }
             } else if (!periode) {
-                   showModal('Validasi Input', 'Harap pilih Kelas, Jurusan, dan Periode yang valid.', 'error', 3000);
-                   isValid = false;
+                    showModal('Validasi Input', 'Harap pilih Kelas, Jurusan, dan Periode yang valid.', 'error', 3000);
+                    isValid = false;
             }
 
             if (isValid) {
@@ -3316,8 +3320,8 @@
                     score: score,
                 });
             } else if (score !== '') {
-                   // Beri tahu user jika ada nilai tidak valid
-                   showModal('Validasi Nilai', `Nilai siswa NISN ${nisn} (${score}) harus antara 0 dan 100. Data ini akan diabaikan.`, 'error', 5000);
+                    // Beri tahu user jika ada nilai tidak valid
+                    showModal('Validasi Nilai', `Nilai siswa NISN ${nisn} (${score}) harus antara 0 dan 100. Data ini akan diabaikan.`, 'error', 5000);
             }
         });
         
@@ -3815,6 +3819,3 @@
 </script>
 </body>
 </html>
-
-
-
