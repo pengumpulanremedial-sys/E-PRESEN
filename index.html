@@ -172,7 +172,7 @@
                 -webkit-backdrop-filter: none !important;
             }
             /* Reset warna elemen tabel agar terlihat jelas saat dicetak */
-            .glass-container table, .glass-container thead, .glass-container tbody, .glass-container table, .glass-container td, .glass-container th {
+            .glass-container table, .glass-container thead, .glass-container tbody, .glass-container tr, .glass-container td, .glass-container th {
                 background-color: white !important;
                 color: black !important;
                 border-color: #ccc !important;
@@ -275,8 +275,7 @@
             
             <!-- Logo dan Nama Sekolah (Diperbarui untuk Estetika Modern) -->
             <div class="flex items-center space-x-3 order-1 md:order-1 w-full md:w-auto">
-                <!-- PERUBAHAN 1: UKURAN LOGO DARI h-10 MENJADI h-14 -->
-                <img id="school-logo" class="h-14 w-auto rounded-full shadow-lg transition transform hover:scale-105" 
+                <img id="school-logo" class="h-10 w-auto rounded-full shadow-lg transition transform hover:scale-105" 
                     src="https://placehold.co/40x40/ffffff/indigo?text=S" 
                     onerror="this.onerror=null; this.src='https://placehold.co/40x40/ffffff/indigo?text=S';"
                     alt="Logo Sekolah">
@@ -466,8 +465,6 @@
     const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1F72NOuTyeDYePeu5nLk_oLrvjecx-5iLCxj3cO57l1Y/edit";
     // GANTI URL INI DENGAN URL WEB APP DEPLOYMENT GOOGLE APPS SCRIPT ANDA!
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbztCAlxqc5p9fM4gKWy6dnR1s0mDoNxJGmx7UpSn0N8YJOsakA5J_-t0un1RddHM6KVqA/exec"; 
-    // PENTING! PASTIKAN INI ADALAH URL DARI PENERAPAN (DEPLOYMENT) TERBARU GOOGLE APPS SCRIPT ANDA.
-    // PASTIKAN AKSES DITETAPKAN KE "Anyone" (Bahkan Anonim). Kesalahan jaringan biasanya disebabkan oleh masalah deployment.
     
     let currentUser = null;
     let currentTab = '';
@@ -500,10 +497,6 @@
     let comparisonChartInstanceClass = null; 
     let comparisonChartInstanceMajor = null; 
     let adminRecapChartInstance = null;
-    
-    // --- OPTIMIZATION 1: Pesan Error Generik untuk UX yang lebih mulus ---
-    const GENERIC_NETWORK_ERROR = 'Gagal terhubung ke server Apps Script. Kemungkinan: URL salah, atau izin Akses Deploy (CORS) belum disetel ke "Anyone". Lihat console log untuk detail teknis.';
-    // --- END OPTIMIZATION 1 ---
 
     // --- ROLE MAP ---
     const ROLE_MAP = {
@@ -814,12 +807,11 @@
 
 
     // ====================================================================
-    // --- 3. GAS COMMUNICATION FUNCTIONS --- (OPTIMIZED)
+    // --- 3. GAS COMMUNICATION FUNCTIONS --- (FIX BUG 1: Tambahkan Retry Logic)
     // ====================================================================
 
     async function fetchData(endpointUrl) {
-        // PERBAIKAN STABILITAS: Pemeriksaan WEB_APP_URL
-        if (WEB_APP_URL === "" || WEB_APP_URL.includes("URL_APPS_SCRIPT_DISINI")) { 
+        if (WEB_APP_URL === "" || WEB_APP_URL.includes("URL_APPS_SCRIPT_DISINI")) { // Hapus pengecekan yang salah
             console.error("WEB_APP_URL belum diatur.");
             showModal('Error Konfigurasi', 'WEB_APP_URL harus diisi. Harap ganti placeholder "URL_APPS_SCRIPT_DISINI" dengan URL Web App Anda yang berakhiran /exec.', 'error', 5000);
             return null;
@@ -837,27 +829,17 @@
                 
                 if (text.trim().startsWith('<')) {
                     // This error indicates a server crash or a redirection, often due to an invalid SPREADSHEET_ID in Apps Script.
-                    throw new Error('Apps Script Server Crash: Server mengembalikan kode HTML (bukan JSON/Text). Cek SPREADSHEET_ID di Apps Script.');
+                    throw new Error('Apps Script Server Crash: Server mengembalikan kode HTML (bukan JSON/Text).');
                 }
 
                 try {
                     const result = JSON.parse(text);
                     if (result.status === 'error' && result.message.includes('Aksi tidak dikenali.')) {
-                        const specificError = `Error: ${result.message} (Harap REDEPLOY ULANG Google Apps Script sebagai VERSI BARU).`;
+                        const specificError = `Error: ${result.message} Anda perlu melakukan REDEPLOY ULANG Google Apps Script sebagai VERSI BARU setelah menambahkan kode fungsi terkait ke file Code.gs.`;
                         throw new Error(specificError);
                     }
                     return result; // Success, break out of loop
                 } catch (e) {
-                    // OPTIMIZATION: Attempt re-parsing for cases where GAS returns valid JSON but it's incorrectly parsed by the initial try/catch block.
-                    if (text.trim().startsWith('{') && text.trim().endsWith('}')) {
-                        try {
-                            return JSON.parse(text);
-                        } catch (reParseError) {
-                            console.error("Failed to re-parse JSON string:", reParseError);
-                            // Fall through to non-JSON error handling
-                        }
-                    }
-                    
                     if (text.includes('Absensi berhasil disimpan.') || text.includes('Pembaruan nilai berhasil.')) {
                         return { status: 'success', message: text };
                     }
@@ -873,10 +855,10 @@
                     await new Promise(resolve => setTimeout(resolve, (2 ** attempt) * 1000));
                 } else {
                     // Final attempt failed
-                    console.error('Fetch/CORS Error (Final Fail):', error);
-                    // OPTIMIZATION: Use shorter error message for the modal
-                    showModal('Koneksi Gagal', GENERIC_NETWORK_ERROR, 'error', 7000);
-                    return { status: 'error', message: GENERIC_NETWORK_ERROR };
+                    console.error('Fetch/CORS Error:', error);
+                    const errorMessage = `Gagal terhubung ke server Apps Script (Network/CORS Error) setelah ${MAX_RETRIES} kali percobaan. PASTIKAN: 1) URL /exec sudah benar, 2) Akses "Anyone" saat di-deploy, 3) Redeploy Versi Baru. Error Terakhir: ${error.message.substring(0, 100)}...`;
+                    showModal('Koneksi Gagal (Retry Failed)', errorMessage, 'error', 7000);
+                    return { status: 'error', message: errorMessage };
                 }
             }
         }
@@ -884,8 +866,7 @@
 
 
     async function postData(payload) {
-        // PERBAIKAN STABILITAS: Pemeriksaan WEB_APP_URL
-        if (WEB_APP_URL === "" || WEB_APP_URL.includes("URL_APPS_SCRIPT_DISINI")) { 
+        if (WEB_APP_URL === "" || WEB_APP_URL.includes("URL_APPS_SCRIPT_DISINI")) { // Hapus pengecekan yang salah
             showModal('Error Konfigurasi', 'WEB_APP_URL harus diisi. Harap ganti placeholder "URL_APPS_SCRIPT_DISINI" dengan URL Web App Anda yang berakhiran /exec.', 'error', 5000);
             return { status: 'error', message: 'WEB_APP_URL belum diatur.' };
         }
@@ -900,23 +881,13 @@
                 const text = await response.text();
                 
                 if (text.trim().startsWith('<')) {
-                    throw new Error('Apps Script Server Crash: Server mengembalikan kode HTML (bukan JSON/Text). Cek SPREADSHEET_ID di Apps Script.');
+                    throw new Error('Apps Script Server Crash: Server mengembalikan kode HTML (bukan JSON/Text).');
                 }
 
                 try {
                     const result = JSON.parse(text);
                     return result; // Success, break out of loop
                 } catch (e) {
-                    // OPTIMIZATION: Attempt re-parsing for cases where GAS returns valid JSON but it's incorrectly parsed by the initial try/catch block.
-                    if (text.trim().startsWith('{') && text.trim().endsWith('}')) {
-                        try {
-                            return JSON.parse(text);
-                        } catch (reParseError) {
-                            console.error("Failed to re-parse JSON string:", reParseError);
-                            // Fall through to non-JSON error handling
-                        }
-                    }
-                    
                     if (text.includes('Absensi berhasil disimpan.') || text.includes('Pembaruan nilai berhasil.') || text.includes('Data siswa baru berhasil ditambahkan.') || text.includes('siswa telah dihapus berdasarkan filter') || text.includes('konfigurasi berhasil disimpan.')) {
                         return { status: 'success', message: text };
                     }
@@ -932,10 +903,10 @@
                     await new Promise(resolve => setTimeout(resolve, (2 ** attempt) * 1000));
                 } else {
                     // Final attempt failed
-                    console.error('Fetch/CORS Error (Final Fail):', error);
-                    // OPTIMIZATION: Use shorter error message for the modal
-                    showModal('Koneksi Gagal', GENERIC_NETWORK_ERROR, 'error', 7000);
-                    return { status: 'error', message: GENERIC_NETWORK_ERROR };
+                    console.error('Fetch/CORS Error:', error);
+                    const errorMessage = `Gagal terhubung ke server Apps Script (Network/CORS Error) setelah ${MAX_RETRIES} kali percobaan. PASTIKAN: 1) URL /exec sudah benar, 2) Akses "Anyone" saat di-deploy, 3) Redeploy Versi Baru. Error Terakhir: ${error.message.substring(0, 100)}...`;
+                    showModal('Koneksi Gagal (Retry Failed)', errorMessage, 'error', 7000);
+                    return { status: 'error', message: errorMessage };
                 }
             }
         }
@@ -975,20 +946,7 @@
              }
         }
     }
-    
-    // PERUBAHAN 2: FUNGSI BARU UNTUK MEMUAT KONFIGURASI DARI SERVER (PERSISTENSI)
-    async function getAppConfiguration() {
-        const url = `${WEB_APP_URL}?action=getAppConfiguration`;
-        const result = await fetchData(url);
-        
-        if (result && result.status === 'success' && result.config) {
-            APP_CONFIG.SCHOOL_NAME = result.config.schoolName || APP_CONFIG.SCHOOL_NAME;
-            APP_CONFIG.LOGO_URL = result.config.logoUrl || APP_CONFIG.LOGO_URL;
-        } else {
-            console.warn("Gagal memuat konfigurasi dari server. Menggunakan konfigurasi default.");
-        }
-    }
-    // AKHIR PERUBAHAN 2
+
 
     // ====================================================================
     // --- 4. CORE LOGIC (LOGIN, NAVIGATION, STATE) --- (Updated)
@@ -2090,7 +2048,7 @@
             </div>
             
             <div id="manual-attendance-area" class="mt-8">
-                                <p id="manual-message" class="text-center text-white/70 py-10">Pilih Kelas, Jurusan, dan Tanggal untuk memuat daftar siswa.</p>
+                            <p id="manual-message" class="text-center text-white/70 py-10">Pilih Kelas, Jurusan, dan Tanggal untuk memuat daftar siswa.</p>
                             
                             <!-- Student List Table (will be populated dynamically) -->
                             <form id="manual-attendance-submit-form" class="hidden">
@@ -2336,7 +2294,7 @@
                         </tbody>
                     </table>
                 </div>
-                                             <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
+                                     <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
                         <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Perubahan Data Massal
                     </button>
             </form>
@@ -2596,8 +2554,8 @@
             resultsDiv.classList.remove('hidden');
 
         } else {
-            // OPTIMIZATION: Use generic network error message if API fails silently or with generic message
-            const errorMessage = (result && result.message) ? result.message : GENERIC_NETWORK_ERROR;
+            // FIX for "Gagal memuat rekap. undefined"
+            const errorMessage = result ? (result.message || 'Error tidak terduga dari server Apps Script. Pastikan fungsi Apps Script **getRecap** sudah di-redeploy.') : 'Gagal terhubung ke server Apps Script. Periksa koneksi atau konfigurasi URL.';
             messageDiv.innerHTML = `<p class="font-semibold text-red-400">Gagal memuat rekap. ${errorMessage}</p>`;
             currentRecapData = []; // Clear data on failure
             currentRecapFilters = {}; // Clear filters
@@ -2670,8 +2628,8 @@
             resultsDiv.classList.remove('hidden');
 
         } else {
-            // OPTIMIZATION: Use generic network error message if API fails silently or with generic message
-            const errorMessage = (result && result.message) ? result.message : GENERIC_NETWORK_ERROR;
+            // FIX for "Gagal memuat rekap. undefined"
+            const errorMessage = result ? (result.message || 'Error tidak terduga dari server Apps Script. Pastikan fungsi Apps Script **getTotalRecap** sudah di-redeploy.') : 'Gagal terhubung ke server Apps Script. Periksa koneksi atau konfigurasi URL.';
             messageDiv.innerHTML = `<p class="font-semibold text-red-400">Gagal memuat rekap total. ${errorMessage}</p>`;
             currentTotalRecapData = []; // Clear data on failure
             currentRecapFilters = {}; // Clear filters
@@ -2781,9 +2739,7 @@
         const result = await fetchData(url);
 
         if (!result || result.status !== 'success' || !result.demographic || !result.attendance_percent) {
-            // OPTIMIZATION: Use generic network error message if API fails silently or with generic message
-            const errorMessage = (result && result.message) ? result.message : GENERIC_NETWORK_ERROR;
-            messageDiv.innerHTML = `<p class="font-semibold text-red-400">${errorMessage}</p>`;
+            messageDiv.innerHTML = `<p class="font-semibold text-red-400">${result ? (result.message || 'Gagal memuat data perbandingan. Pastikan fungsi Apps Script **getComparisonData** sudah di-redeploy.') : 'Gagal memuat data perbandingan (Error Koneksi/Server).'}</p>`;
             return;
         }
 
@@ -2855,9 +2811,8 @@
         if (result && result.status === 'success' && result.photos) {
             renderPhotoGrid(result.photos);
         } else {
-            // OPTIMIZATION: Use generic network error message if API fails silently or with generic message
-            const msg = (result && result.message) ? result.message : GENERIC_NETWORK_ERROR;
-            messageDiv.innerHTML = `<p class="font-semibold text-red-400">Error: ${msg}</p>`;
+            const msg = result ? result.message : 'Gagal memuat data foto.';
+            messageDiv.innerHTML = `<p class="font-semibold text-red-400">Error: ${msg}. Pastikan fungsi Apps Script **getAttendancePhotos** sudah di-redeploy.</p>`;
         }
     }
 
@@ -2954,10 +2909,12 @@
         if (result && result.status === 'success' && result.students) {
             studentListWithStatus = result.students;
         } else {
-            // OPTIMIZATION: Use generic network error message if API fails silently or with generic message
-            const errorMessage = (result && result.message) ? result.message : GENERIC_NETWORK_ERROR;
-            messageDiv.innerHTML = `<p class="font-semibold text-red-500">Error: ${errorMessage}</p>`;
-            return;
+             if (result && result.message && result.message.includes('Aksi tidak dikenali.')) {
+                 messageDiv.innerHTML = `<p class="font-semibold text-red-500">Error Server: Fungsi "getStudentListWithStatus" tidak ditemukan. Harap pastikan Anda telah menyimpan dan **REDEPLOY** Apps Script terbaru.</p>`;
+             } else {
+                 messageDiv.innerHTML = `<p class="font-semibold text-red-500">${result ? result.message : 'Gagal memuat data siswa (Error tidak terduga).'}</p>`;
+             }
+             return;
         }
 
         renderStudentAttendanceTable(studentListWithStatus, kelas, jurusan, date);
@@ -3216,9 +3173,8 @@
         if (result && result.status === 'success' && result.students) {
             studentListWithScores = result.students;
         } else {
-            // OPTIMIZATION: Use generic network error message if API fails silently or with generic message
-            const msg = (result && result.message) ? result.message : GENERIC_NETWORK_ERROR;
-            messageDiv.innerHTML = `<p class="font-semibold text-red-500">Error: ${msg}</p>`;
+            const msg = result ? result.message : 'Gagal memuat data penilaian.';
+            messageDiv.innerHTML = `<p class="font-semibold text-red-500">Error: ${msg}. Pastikan Sheet 'DATA NILAI' dan 'NILAI HARIAN' sudah benar dan skrip Apps Script sudah **REDEPLOY**.</p>`;
             return;
         }
 
@@ -3280,9 +3236,7 @@
         const scoreInput = form.querySelector(`input[name="score_${nisn}"]`);
         const score = scoreInput.value.trim();
         
-        // OPTIMIZATION: Use explicit integer conversion and robust checks
-        const numericScore = parseInt(score);
-        if (score === '' || isNaN(numericScore) || numericScore < 0 || numericScore > 100) {
+        if (score === '' || parseInt(score) < 0 || parseInt(score) > 100) {
              showModal('Validasi Nilai', `Nilai harus antara 0 dan 100.`, 'error', 3000);
              return;
         }
@@ -3292,7 +3246,7 @@
             nama: form.querySelector(`input[name="nama_${nisn}"]`).value,
             kelas: form.querySelector(`input[name="kelas_${nisn}"]`).value,
             jurusan: form.querySelector(`input[name="jurusan_${nisn}"]`).value,
-            score: numericScore, // Use numeric score
+            score: score,
         }];
         
         showModal('Mengirim Data', `Menyimpan nilai ${type.toUpperCase()} untuk NISN ${nisn} secara individual...`, 'loading', 0);
@@ -3330,10 +3284,8 @@
         if (e.target.tagName.toLowerCase() === 'input' && e.target.name.startsWith('score_')) {
             const score = e.target.value.trim();
             
-            // OPTIMIZATION: Use explicit integer conversion and robust checks
-            const numericScore = parseInt(score);
-
-            if (score === '' || isNaN(numericScore) || numericScore < 0 || numericScore > 100) {
+            // Validasi nilai
+            if (score === '' || parseInt(score) < 0 || parseInt(score) > 100) {
                 hideMiniPopup();
                 return;
             }
@@ -3359,16 +3311,13 @@
             const scoreInput = form.querySelector(`input[name="score_${nisn}"]`);
             const score = scoreInput.value.trim();
             
-            // OPTIMIZATION: Use explicit integer conversion and robust checks
-            const numericScore = parseInt(score);
-
-            if (score !== '' && !isNaN(numericScore) && numericScore >= 0 && numericScore <= 100) {
+            if (score !== '' && parseInt(score) >= 0 && parseInt(score) <= 100) {
                 updates.push({ 
                     nisn: nisn, 
                     nama: form.querySelector(`input[name="nama_${nisn}"]`).value,
                     kelas: form.querySelector(`input[name="kelas_${nisn}"]`).value,
                     jurusan: form.querySelector(`input[name="jurusan_${nisn}"]`).value,
-                    score: numericScore,
+                    score: score,
                 });
             } else if (score !== '') {
                     // Beri tahu user jika ada nilai tidak valid
@@ -3445,9 +3394,7 @@
                 allStudentsData = result.students;
             } else {
                 console.error("Gagal memuat semua data siswa:", result);
-                // OPTIMIZATION: Use generic network error message if API fails silently or with generic message
-                const errorMessage = (result && result.message) ? result.message : GENERIC_NETWORK_ERROR;
-                messageDiv.innerHTML = `<p class="font-semibold text-red-500">Gagal memuat semua data siswa. ${errorMessage}</p>`;
+                messageDiv.innerHTML = `<p class="font-semibold text-red-500">Gagal memuat semua data siswa. Pastikan fungsi 'getAllStudents' sudah di-redeploy di Apps Script.</p>`;
                 if (bulkDeleteBtn) bulkDeleteBtn.setAttribute('disabled', 'disabled'); 
                 filteredCountSpan.textContent = '0';
                 return;
@@ -3792,9 +3739,7 @@
             APP_CONFIG.LOGO_URL = logoUrl;
             updateHeaderDisplay();
             
-            showModal('Konfigurasi Berhasil', 'Nama sekolah dan URL logo berhasil diperbarui. Halaman akan dimuat ulang untuk memuat konfigurasi baru secara permanen.', 'success', 3000);
-            // PERUBAHAN 2: Muat ulang halaman setelah menyimpan konfigurasi agar APP_CONFIG diperbarui oleh getAppConfiguration
-            setTimeout(() => window.location.reload(), 3000);
+            showModal('Konfigurasi Berhasil', 'Nama sekolah dan URL logo berhasil diperbarui.', 'success', 3000);
         } else {
             showModal('Penyimpanan Gagal', result ? result.message : 'Terjadi kesalahan saat menyimpan konfigurasi. Pastikan fungsi Apps Script **saveAppConfiguration** sudah di-redeploy.', 'error', 5000);
         }
@@ -3809,13 +3754,6 @@
     document.getElementById('login-form').addEventListener('submit', async function(e) {
         e.preventDefault();
         
-        // PERBAIKAN STABILITAS: Pemeriksaan WEB_APP_URL sebelum mencoba login
-        if (WEB_APP_URL === "" || WEB_APP_URL.includes("URL_APPS_SCRIPT_DISINI")) {
-            document.getElementById('login-message').innerText = 'ERROR: URL Apps Script belum diatur atau salah format.';
-            document.getElementById('login-message').classList.remove('hidden');
-            return;
-        }
-
         if (!currentRole) {
             document.getElementById('login-message').innerText = 'Harap pilih peran Anda terlebih dahulu.';
             document.getElementById('login-message').classList.remove('hidden');
@@ -3843,11 +3781,7 @@
         }
     });
 
-    // PERUBAHAN 2: JADIKAN ASYNC DAN PANGGIL getAppConfiguration()
-    document.addEventListener('DOMContentLoaded', async () => {
-        // Muat konfigurasi dari server terlebih dahulu (persisten)
-        await getAppConfiguration(); 
-        
+    document.addEventListener('DOMContentLoaded', () => {
         updateHeaderDisplay();
         
         if (typeof lucide !== 'undefined') {
@@ -3861,7 +3795,6 @@
             // Biarkan halaman login/pilihan peran ditampilkan
         }
     });
-    // AKHIR PERUBAHAN 2
     
     setInterval(updateTime, 1000);
     
@@ -3886,8 +3819,3 @@
 </script>
 </body>
 </html>
-
-
-
-
-
