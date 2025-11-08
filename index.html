@@ -6,7 +6,7 @@
     <title>SMK Sehati Karawang - Sistem Absensi</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com/"></script>
-    <!-- Lucide Icons for aesthetic icons -->
+    <!-- LucidAe Icons for aesthetic icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Chart.js CDN for interactive charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
@@ -84,7 +84,7 @@
         .print-only { 
             display: none !important; 
         }
-        
+
         /* NEW: Floating Blobs (Gambar Bergerak) */
         .blob {
             position: absolute;
@@ -141,7 +141,7 @@
             h2, .bg-purple-50, .bg-indigo-50, #modal-message, #mini-popup, #dashboard-tabs, 
             .print-hidden, #recap-results > div:nth-child(1), #admin-recap-results > div:nth-child(1), 
             #teacher-recap-form, #admin-recap-form, #total-recap-form, #total-recap-message,
-            #photo-dashboard-form, #photo-dashboard-gallery {
+            #photo-dashboard-form, #photo-dashboard-message, #photo-grid {
                 display: none !important;
             }
             
@@ -446,7 +446,6 @@
     let currentRecapData = [];
     let currentTotalRecapData = []; // NEW: Untuk menyimpan data rekap total
     let currentRecapFilters = {}; // NEW: Store current filters for printing/export
-    let photoRecords = []; // NEW: State untuk menyimpan data foto
 
     // NEW: Global state untuk filter manajemen siswa
     let currentFilterTerm = '';
@@ -477,25 +476,23 @@
         'admin': { id: 'admin', label: 'Admin', icon: 'shield-check', placeholder: 'Masukkan NIP' },
     };
 
-    // PERUBAHAN: Menambahkan Tab Dashboard Foto ke Guru dan Admin
     const TABS = {
         student: [
             { id: 'absensi', label: 'Isi Absensi', icon: 'check-circle' },
             { id: 'profil', label: 'Profil Saya', icon: 'user' },
         ],
         teacher: [
+            { id: 'photo-dashboard', label: 'Dashboard Foto', icon: 'image' }, // NEW TAB
             { id: 'rekap-guru', label: 'Rekap Detail Harian', icon: 'file-text' }, // Existing Detail Recap
             { id: 'rekap-total', label: 'Rekap Total Absen', icon: 'bar-chart-2' }, // NEW Total Recap
             { id: 'dashboard-grafik', label: 'Dashboard Grafik', icon: 'bar-chart-3' }, // RENAMED
             { id: 'absensi-siswa', label: 'Absensi Manual Siswa', icon: 'calendar-check' }, 
             { id: 'penilaian', label: 'Input Penilaian', icon: 'file-plus' },
-            { id: 'dashboard-foto', label: 'Dashboard Foto', icon: 'image' }, // NEW PHOTO TAB
             { id: 'profil', label: 'Profil Saya', icon: 'user' },
         ],
         admin: [
             { id: 'rekap-admin', label: 'Rekap Detail Global', icon: 'database' },
             { id: 'rekap-total', label: 'Rekap Total Absen', icon: 'bar-chart-2' }, // NEW Total Recap
-            { id: 'dashboard-foto', label: 'Dashboard Foto', icon: 'image' }, // NEW PHOTO TAB
             { id: 'konfigurasi', label: 'Konfigurasi Aplikasi', icon: 'settings' }, 
             { id: 'manajemen', label: 'Manajemen Data Siswa', icon: 'users' }, 
         ]
@@ -950,11 +947,6 @@
         // FIX: Ensure both comparison chart instances are destroyed
         if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; } 
         if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
-        
-        // Clear photo state on tab change
-        if (tabId !== 'dashboard-foto') {
-            photoRecords = [];
-        }
 
         if (tabId !== 'rekap-guru' && tabId !== 'rekap-admin') {
             currentRecapData = [];
@@ -968,6 +960,10 @@
 
 
         switch (tabId) {
+            case 'photo-dashboard': // NEW CASE
+                contentDiv.innerHTML = renderTeacherPhotoDashboard();
+                setupTeacherPhotoDashboardListeners();
+                break;
             case 'absensi':
                 contentDiv.innerHTML = renderStudentAttendanceForm();
                 contentDiv.insertAdjacentHTML('beforeend', renderStudentAttendanceHistory());
@@ -1009,11 +1005,6 @@
                 contentDiv.innerHTML = renderAdminManagement();
                 setupAdminManagementListeners();
                 break;
-            // NEW CASE: Dashboard Foto
-            case 'dashboard-foto':
-                contentDiv.innerHTML = renderPhotoDashboard();
-                setupPhotoDashboardListeners();
-                break;
             default:
                 contentDiv.innerHTML = `<p class="text-center text-gray-500 py-10">Pilih menu di atas.</p>`;
         }
@@ -1031,7 +1022,7 @@
                 const role = ROLE_MAP[key];
                 // NEW: Menggunakan warna transparan untuk tombol yang tidak aktif
                 const btn = document.getElementById(`role-btn-${role.id}`);
-                btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg'); // Remove previous active style
+                btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg');
                 btn.classList.add('bg-white/20', 'text-white', 'hover:bg-white/40');
             });
             const selectedBtn = document.getElementById(`role-btn-${roleId}`);
@@ -1106,7 +1097,7 @@
         let tabToOpen = initialTab;
         if (!tabToOpen) {
             if (currentUser.role === 'student') tabToOpen = 'absensi';
-            else if (currentUser.role === 'teacher') tabToOpen = 'rekap-guru';
+            else if (currentUser.role === 'teacher') tabToOpen = 'photo-dashboard'; // Change default tab for teacher
             else if (currentUser.role === 'admin') tabToOpen = 'rekap-admin';
         }
         selectTab(tabToOpen);
@@ -1119,7 +1110,7 @@
         if (comparisonChartInstanceClass) { comparisonChartInstanceClass.destroy(); comparisonChartInstanceClass = null; }
         if (comparisonChartInstanceMajor) { comparisonChartInstanceMajor.destroy(); comparisonChartInstanceMajor = null; }
 
-        allStudentsData = []; currentRecapData = []; currentTotalRecapData = []; photoRecords = [];
+        allStudentsData = []; currentRecapData = []; currentTotalRecapData = [];
         currentUser = null; currentRole = null; currentTab = '';
         saveAppState(); // Removes state
 
@@ -1323,6 +1314,8 @@
                         borderWidth: 1,
                         boxPadding: 8,
                         usePointStyle: true,
+                        // NEW: Custom hover effect
+                        caretPadding: 10,
                     } 
                 },
                 layout: {
@@ -1437,7 +1430,7 @@
                         grid: { color: 'rgba(255, 255, 255, 0.15)' }
                     }
                 }
-            }
+            },
         });
 
         comparisonChartInstanceMajor = newChart;
@@ -1446,6 +1439,52 @@
     // ====================================================================
     // --- 6. RENDERING FUNCTIONS (Membangun Struktur HTML) ---
     // ====================================================================
+
+    // NEW: Render Halaman Dashboard Foto
+    function renderTeacherPhotoDashboard() {
+        const allClasses = currentUser.kelasAjar || [];
+        const allMajors = currentUser.jurusanAjar || [];
+        const currentDate = new Date().toISOString().split('T')[0];
+
+        return `
+            <h3 class="text-2xl font-bold text-white mb-6 flex items-center"><span data-lucide="image" class="w-6 h-6 mr-2"></span> Dashboard Foto Absensi Siswa</h3>
+            <p class="text-white/90 mb-6">Lihat dan verifikasi foto absensi siswa berdasarkan filter tanggal, kelas, dan jurusan.</p>
+            <div class="glass-element p-5 rounded-lg shadow-inner mb-6 print-hidden">
+                <form id="photo-dashboard-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div>
+                        <label for="photo-date" class="block text-sm font-medium text-white/90">Tanggal Absensi</label>
+                        <input type="date" id="photo-date" value="${currentDate}" required class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
+                    </div>
+                    <div>
+                        <label for="photo-kelas" class="block text-sm font-medium text-white/90">Kelas</label>
+                        <select id="photo-kelas" required class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
+                            <option value="" class="bg-indigo-700">-- Pilih Kelas --</option>
+                            <option value="ALL" class="bg-indigo-700">-- SEMUA KELAS --</option>
+                            ${allClasses.map(c => `<option value="${c}" class="bg-indigo-700">${c}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="photo-jurusan" class="block text-sm font-medium text-white/90">Jurusan</label>
+                        <select id="photo-jurusan" required class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
+                            <option value="" class="bg-indigo-700">-- Pilih Jurusan --</option>
+                            <option value="ALL" class="bg-indigo-700">-- SEMUA JURUSAN --</option>
+                            ${allMajors.map(j => `<option value="${j}" class="bg-indigo-700">${j}</option>`).join('')}
+                        </select>
+                    </div>
+                    <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
+                        <span data-lucide="image-search" class="w-4 h-4 mr-2"></span> Tampilkan Foto
+                    </button>
+                </form>
+            </div>
+            
+            <div id="photo-results-area" class="mt-8">
+                <p id="photo-dashboard-message" class="text-center text-white/70 py-10">Pilih filter di atas untuk memuat foto absensi.</p>
+                <div id="photo-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 hidden">
+                    <!-- Photo Cards will be dynamically inserted here -->
+                </div>
+            </div>
+        `;
+    }
 
     function renderStudentAttendanceForm() {
         let formSection = '';
@@ -2015,7 +2054,7 @@
                 <h4 class="text-lg font-bold text-white">Opsi Alternatif: Logo Base64</h4>
                 <div>
                     <label for="config-logo-base64" class="block text-sm font-medium text-white/90">Tempel String Base64 Gambar</label>
-                    <textarea id="config-logo-base64" rows="3" placeholder="Contoh: data:image/png;base64,iVBORw0KGgoAAAAN..." class="w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 resize-none glass-element"></textarea>
+                    <textarea id="config-logo-base64" rows="3" placeholder="Contoh: data:image/png;base64,iVBORw0goAAAAN..." class="w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 resize-none glass-element"></textarea>
                 </div>
                 <button id="apply-base64-btn" type="button" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center transition duration-200 modern-hover">
                     <span data-lucide="image" class="w-4 h-4 mr-2"></span> Terapkan Logo dari Base64
@@ -2105,21 +2144,21 @@
             <p id="admin-management-message" class="text-center text-white/70 py-10">Memuat data siswa...</p>
             
             <form id="admin-student-update-form" class="hidden">
-                                 <div class="flex flex-col space-y-3 md:flex-row justify-between items-center mb-4 md:space-y-0 print-hidden">
-                                 <button type="button" onclick="openAddStudentModal()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center transition duration-200 modern-hover">
-                                     <span data-lucide="user-plus" class="w-4 h-4 mr-2"></span> Tambah Siswa Baru
+                             <div class="flex flex-col space-y-3 md:flex-row justify-between items-center mb-4 md:space-y-0 print-hidden">
+                             <button type="button" onclick="openAddStudentModal()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center transition duration-200 modern-hover">
+                                 <span data-lucide="user-plus" class="w-4 h-4 mr-2"></span> Tambah Siswa Baru
+                             </button>
+                             
+                             <div class="flex space-x-3 w-full md:w-auto">
+                                 <button onclick="openGoogleSheetLink()" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center transition duration-200 modern-hover">
+                                     <span data-lucide="external-link" class="w-4 h-4 mr-2"></span> Edit Data di Sheet
                                  </button>
-                                 
-                                 <div class="flex space-x-3 w-full md:w-auto">
-                                     <button onclick="openGoogleSheetLink()" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center transition duration-200 modern-hover">
-                                         <span data-lucide="external-link" class="w-4 h-4 mr-2"></span> Edit Data di Sheet
-                                     </button>
-                                     <!-- NEW BULK DELETE BUTTON (Perbaikan 3) -->
-                                     <button onclick="handleDeleteFilteredStudents()" type="button" id="bulk-delete-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center disabled:opacity-50" disabled>
-                                         <span data-lucide="trash-2" class="w-4 h-4 mr-2"></span> Hapus Berdasarkan Filter (<span id="filtered-count">0</span>)
-                                     </button>
-                                 </div>
-                                 </div>
+                                 <!-- NEW BULK DELETE BUTTON (Perbaikan 3) -->
+                                 <button onclick="handleDeleteFilteredStudents()" type="button" id="bulk-delete-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center disabled:opacity-50" disabled>
+                                     <span data-lucide="trash-2" class="w-4 h-4 mr-2"></span> Hapus Berdasarkan Filter (<span id="filtered-count">0</span>)
+                                 </button>
+                             </div>
+                             </div>
 
                 <div id="admin-student-list-container" class="overflow-x-auto rounded-lg shadow-lg border border-white/30 mb-6">
                     <table class="min-w-full divide-y divide-white/20">
@@ -2139,153 +2178,12 @@
                         </tbody>
                     </table>
                 </div>
-                                 <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
+                            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
                         <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Perubahan Data Massal
                     </button>
             </form>
         `;
     }
-    
-    // NEW FUNCTION: Render Photo Dashboard
-    function renderPhotoDashboard() {
-        const allClasses = currentUser.kelasAjar || [];
-        const allMajors = currentUser.jurusanAjar || [];
-        const currentDate = new Date().toISOString().split('T')[0];
-
-        return `
-            <h3 class="text-2xl font-bold text-white mb-6 flex items-center"><span data-lucide="image" class="w-6 h-6 mr-2"></span> Dashboard Foto Kehadiran</h3>
-            <p class="text-white/90 mb-6">Lihat galeri foto absensi siswa berdasarkan filter.</p>
-            
-            <div id="photo-dashboard-form" class="glass-element p-5 rounded-lg shadow-inner mb-6 print-hidden">
-                <form id="photo-filter-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div>
-                        <label for="photo-date" class="block text-sm font-medium text-white/90">Tanggal Absensi</label>
-                        <input type="date" id="photo-date" value="${currentDate}" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
-                    </div>
-                    <div>
-                        <label for="photo-kelas" class="block text-sm font-medium text-white/90">Kelas</label>
-                        <select id="photo-kelas" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Semua Kelas --</option>
-                            ${allClasses.map(c => `<option value="${c}" class="bg-indigo-700">${c}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="photo-jurusan" class="block text-sm font-medium text-white/90">Jurusan</label>
-                        <select id="photo-jurusan" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Semua Jurusan --</option>
-                            ${allMajors.map(j => `<option value="${j}" class="bg-indigo-700">${j}</option>`).join('')}
-                        </select>
-                    </div>
-                    <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
-                        <span data-lucide="camera" class="w-4 h-4 mr-2"></span> Muat Foto
-                    </button>
-                </form>
-            </div>
-
-            <div id="photo-dashboard-area" class="mt-8">
-                <p id="photo-message" class="text-center text-white/70 py-10">Pilih tanggal, kelas, dan jurusan untuk memuat galeri foto.</p>
-                <div id="photo-gallery" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 hidden">
-                    <!-- Photo cards will be rendered here -->
-                </div>
-            </div>
-        `;
-    }
-
-    // --- NEW HANDLERS FOR PHOTO DASHBOARD ---
-
-    function setupPhotoDashboardListeners() {
-        const form = document.getElementById('photo-filter-form');
-        if (form) {
-            form.addEventListener('submit', handlePhotoFilterSubmission);
-        }
-    }
-
-    async function handlePhotoFilterSubmission(e) {
-        e.preventDefault();
-        
-        const date = document.getElementById('photo-date').value;
-        const kelas = document.getElementById('photo-kelas').value;
-        const jurusan = document.getElementById('photo-jurusan').value;
-        const messageDiv = document.getElementById('photo-message');
-        const galleryDiv = document.getElementById('photo-gallery');
-
-        galleryDiv.classList.add('hidden');
-        messageDiv.classList.remove('hidden');
-        
-        // Validation
-        if (!date) {
-            messageDiv.innerHTML = `<p class="font-semibold text-red-500">Tanggal wajib diisi.</p>`;
-            return;
-        }
-
-        // Display loading
-        messageDiv.innerHTML = `<div class="flex flex-col justify-center items-center py-5">
-            <div class="animate-spin mb-4">
-                <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
-            </div>
-            <span class="text-white text-lg font-bold">Memuat foto kehadiran...</span>
-        </div>`;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-
-        // Fetch data
-        const url = `${WEB_APP_URL}?action=getAttendancePhotos&date=${date}&kelas=${kelas}&jurusan=${jurusan}`;
-        const result = await fetchData(url);
-
-        if (result && result.status === 'success' && result.photos) {
-            photoRecords = result.photos.filter(p => p.photo_url && p.photo_url !== 'Error Drive ID');
-            
-            if (photoRecords.length === 0) {
-                messageDiv.innerHTML = `<p class="font-semibold text-white/90">Tidak ditemukan foto kehadiran untuk filter ini (Pastikan siswa mengambil foto dan **DRIVE_PHOTO_FOLDER_ID** di Apps Script sudah benar).</p>`;
-                galleryDiv.innerHTML = '';
-            } else {
-                renderPhotoGallery(photoRecords);
-                messageDiv.classList.add('hidden');
-                galleryDiv.classList.remove('hidden');
-            }
-        } else {
-            const errorMessage = result ? (result.message || 'Error tidak terduga dari server Apps Script. Pastikan fungsi **getAttendancePhotos** sudah di-redeploy.') : 'Gagal terhubung ke server Apps Script.';
-            messageDiv.innerHTML = `<p class="font-semibold text-red-400">Gagal memuat foto. ${errorMessage}</p>`;
-            galleryDiv.innerHTML = '';
-            photoRecords = [];
-        }
-    }
-
-    function renderPhotoGallery(photos) {
-        const galleryDiv = document.getElementById('photo-gallery');
-        galleryDiv.innerHTML = '';
-        
-        const galleryHtml = photos.map(photo => `
-            <div class="bg-white/10 p-4 rounded-xl shadow-lg border border-white/30 modern-hover transition duration-200 flex flex-col h-full">
-                <div class="mb-3">
-                    <p class="text-sm font-bold text-white">${photo.nama || 'Nama Siswa'}</p>
-                    <p class="text-xs text-white/70">${photo.kelas || '-'}/${photo.jurusan || '-'}</p>
-                </div>
-                
-                <div class="relative w-full overflow-hidden rounded-lg shadow-xl mb-3 flex-grow min-h-[150px]">
-                    <img src="${photo.photo_url}" 
-                         onerror="this.onerror=null;this.src='https://placehold.co/300x200/ff0000/white?text=Foto+Tidak+Ditemukan';" 
-                         class="w-full h-full object-cover cursor-pointer"
-                         onload="this.classList.remove('hidden')"
-                         onclick="showModal('Foto Kehadiran', '<img src=\\'${photo.photo_url}\\' class=\\'w-full h-auto rounded-lg\\' alt=\\'Foto Absensi\\'>', 'info', 0, 'image')"
-                         alt="Foto Absensi ${photo.nama || ''}">
-                         
-                    <div class="absolute inset-0 bg-gray-900/50 flex items-center justify-center text-white text-xs p-2 pointer-events-none">
-                        ${!photo.photo_url || photo.photo_url === 'Error Drive ID' ? 'FOTO TIDAK VALID' : ''}
-                    </div>
-                </div>
-                
-                <div class="text-xs text-white/80">
-                    <p class="flex justify-between"><span>Status:</span> <span class="font-semibold ${photo.status === 'Hadir' ? 'text-emerald-300' : 'text-amber-300'}">${photo.status || 'N/A'}</span></p>
-                    <p class="flex justify-between"><span>Waktu:</span> <span class="font-semibold">${photo.time || 'N/A'}</span></p>
-                </div>
-            </div>
-        `).join('');
-
-        galleryDiv.innerHTML = galleryHtml;
-        // Re-initialize lucide icons inside the modal HTML if needed (for confirmation modal icon)
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
-
 
     // ====================================================================
     // --- 7. HANDLER & LISTENER FUNCTIONS (Logic Interaktif) ---
@@ -2637,6 +2535,97 @@
 
             displayRecap(kelas, jurusan, periode, 'recap-results', 'recap-message', 'recap-table-body', 'recap-chart', 'getRecap');
         });
+    }
+    
+    // --- Teacher Photo Dashboard Handlers (NEW) ---
+
+    function setupTeacherPhotoDashboardListeners() {
+        const form = document.getElementById('photo-dashboard-form');
+        if (!form) return;
+
+        form.addEventListener('submit', handlePhotoDashboardLoad);
+    }
+
+    async function handlePhotoDashboardLoad(e) {
+        e.preventDefault();
+
+        const date = document.getElementById('photo-date').value;
+        const kelas = document.getElementById('photo-kelas').value;
+        const jurusan = document.getElementById('photo-jurusan').value;
+        
+        const messageDiv = document.getElementById('photo-dashboard-message');
+        const photoGrid = document.getElementById('photo-grid');
+
+        photoGrid.classList.add('hidden');
+        photoGrid.innerHTML = '';
+        messageDiv.classList.remove('hidden');
+
+        // Display loading message
+        messageDiv.innerHTML = `<div class="flex flex-col justify-center items-center py-5">
+            <div class="animate-spin mb-4">
+                <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
+            </div>
+            <span class="text-white text-lg font-bold">Memuat foto absensi untuk ${kelas === 'ALL' ? 'Semua Kelas' : kelas}/${jurusan === 'ALL' ? 'Semua Jurusan' : jurusan} pada tanggal ${date}...</span>
+        </div>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        if (!date || !kelas || !jurusan) {
+            messageDiv.innerHTML = `<p class="font-semibold text-red-500">Harap pilih Tanggal, Kelas, dan Jurusan yang valid.</p>`;
+            return;
+        }
+        
+        // Use ALL as value if selected, otherwise use the specific filter
+        const filterKelas = kelas === 'ALL' ? '' : kelas;
+        const filterJurusan = jurusan === 'ALL' ? '' : jurusan;
+
+        const url = `${WEB_APP_URL}?action=getAttendancePhotos&date=${date}&kelas=${filterKelas}&jurusan=${filterJurusan}`;
+        const result = await fetchData(url);
+
+        if (result && result.status === 'success' && result.photos) {
+            const photos = result.photos;
+            
+            if (photos.length === 0) {
+                messageDiv.innerHTML = `<p class="font-semibold text-white/70">Tidak ditemukan foto absensi untuk kriteria yang dipilih.</p>`;
+            } else {
+                renderPhotoGrid(photos);
+                messageDiv.classList.add('hidden');
+                photoGrid.classList.remove('hidden');
+            }
+        } else {
+            const msg = result ? (result.message || 'Error tidak terduga dari server Apps Script. Pastikan fungsi Apps Script **getAttendancePhotos** sudah di-redeploy.') : 'Gagal memuat data foto (Error Koneksi/Server).';
+            messageDiv.innerHTML = `<p class="font-semibold text-red-500">Gagal memuat foto: ${msg}</p>`;
+        }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function renderPhotoGrid(photos) {
+        const photoGrid = document.getElementById('photo-grid');
+        photoGrid.innerHTML = photos.map(photo => {
+            let statusColor;
+            if (photo.status === 'Hadir') statusColor = 'border-emerald-500 bg-emerald-700/30 text-emerald-300';
+            else if (photo.status === 'Izin' || photo.status === 'Sakit') statusColor = 'border-amber-500 bg-amber-700/30 text-amber-300';
+            else statusColor = 'border-rose-500 bg-rose-700/30 text-rose-400';
+            
+            // Ensure photo.photo is a valid base64 string, otherwise use placeholder
+            const imgSrc = photo.photo && photo.photo.startsWith('data:image/') ? photo.photo : 'https://placehold.co/300x200/4f46e5/ffffff?text=NO+PHOTO';
+
+            return `
+                <div class="glass-container p-4 rounded-xl shadow-2xl space-y-3 modern-hover transition transform duration-300">
+                    <div class="w-full aspect-video rounded-lg overflow-hidden border-2 ${statusColor}">
+                        <img src="${imgSrc}" onerror="this.onerror=null;this.src='https://placehold.co/300x200/4f46e5/ffffff?text=NO+PHOTO';" alt="Absensi ${photo.nama}" class="w-full h-full object-cover">
+                    </div>
+                    <div class="text-sm font-semibold text-white">
+                        <p class="truncate">${photo.nama || 'Nama Siswa'}</p>
+                        <p class="text-xs text-white/70">${photo.nisn || '-'}</p>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="font-medium ${statusColor.split(' ').filter(c => c.startsWith('text-'))[0]}">${photo.status || '-'}</span>
+                        <span class="text-white/60">${photo.time || '-'}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     // NEW HANDLER: Teacher Total Recap
@@ -3435,7 +3424,7 @@
                     // Clear cache dan reload tabel
                     allStudentsData = [];
                      // FIX: Tambahkan delay 50ms untuk sinkronisasi data Apps Script
-                    setTimeout(() => document.getElementById('admin-management-form').dispatchEvent(new Event('submit')), 50);
+                     setTimeout(() => document.getElementById('admin-management-form').dispatchEvent(new Event('submit')), 50);
                 } else {
                     showModal('Penghapusan Gagal', result ? result.message : 'Terjadi kesalahan saat menghapus data.', 'error', 5000);
                 }
@@ -3684,60 +3673,6 @@
             showModal('Konfigurasi Berhasil', 'Nama sekolah dan URL logo berhasil diperbarui.', 'success', 3000);
         } else {
             showModal('Penyimpanan Gagal', result ? result.message : 'Terjadi kesalahan saat menyimpan konfigurasi. Pastikan fungsi Apps Script **saveAppConfiguration** sudah di-redeploy.', 'error', 5000);
-        }
-    }
-    
-    // --- PHOTO DASHBOARD HANDLERS ---
-    
-    // Fungsi untuk menampilkan galeri foto (sudah ada di atas)
-
-    async function handlePhotoFilterSubmission(e) {
-        e.preventDefault();
-        
-        const date = document.getElementById('photo-date').value;
-        const kelas = document.getElementById('photo-kelas').value;
-        const jurusan = document.getElementById('photo-jurusan').value;
-        const messageDiv = document.getElementById('photo-message');
-        const galleryDiv = document.getElementById('photo-gallery');
-
-        galleryDiv.classList.add('hidden');
-        messageDiv.classList.remove('hidden');
-        
-        // Validation
-        if (!date) {
-            messageDiv.innerHTML = `<p class="font-semibold text-red-500">Tanggal wajib diisi.</p>`;
-            return;
-        }
-
-        // Display loading
-        messageDiv.innerHTML = `<div class="flex flex-col justify-center items-center py-5">
-            <div class="animate-spin mb-4">
-                <span data-lucide="loader-circle" class="w-8 h-8 text-yellow-300"></span>
-            </div>
-            <span class="text-white text-lg font-bold">Memuat foto kehadiran...</span>
-        </div>`;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-
-        // Fetch data
-        const url = `${WEB_APP_URL}?action=getAttendancePhotos&date=${date}&kelas=${kelas}&jurusan=${jurusan}&role=${currentUser.role}&nip=${currentUser.nip || ''}`; // Pass role/nip for authority filter
-        const result = await fetchData(url);
-
-        if (result && result.status === 'success' && result.photos) {
-            photoRecords = result.photos.filter(p => p.photo_url && p.photo_url !== 'Error Drive ID');
-            
-            if (photoRecords.length === 0) {
-                messageDiv.innerHTML = `<p class="font-semibold text-white/90">Tidak ditemukan foto kehadiran untuk filter ini (Pastikan siswa mengambil foto dan **DRIVE_PHOTO_FOLDER_ID** di Apps Script sudah benar).</p>`;
-                galleryDiv.innerHTML = '';
-            } else {
-                renderPhotoGallery(photoRecords);
-                messageDiv.classList.add('hidden');
-                galleryDiv.classList.remove('hidden');
-            }
-        } else {
-            const errorMessage = result ? (result.message || 'Error tidak terduga dari server Apps Script. Pastikan fungsi **getAttendancePhotos** sudah di-redeploy.') : 'Gagal terhubung ke server Apps Script.';
-            messageDiv.innerHTML = `<p class="font-semibold text-red-400">Gagal memuat foto. ${errorMessage}</p>`;
-            galleryDiv.innerHTML = '';
-            photoRecords = [];
         }
     }
 
