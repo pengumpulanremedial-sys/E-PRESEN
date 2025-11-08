@@ -811,7 +811,7 @@
     // ====================================================================
 
     async function fetchData(endpointUrl) {
-        if (WEB_APP_URL === "https://script.google.com/macros/s/AKfycbztCAlxqc5p9fM4gKWy6dnR1s0mDoNxJGmx7UpSn0N8YJOsakA5J_-t0un1RddHM6KVqA/exec" || WEB_APP_URL === "") {
+        if (WEB_APP_URL === "" || WEB_APP_URL.includes("URL_APPS_SCRIPT_DISINI")) { // Hapus pengecekan yang salah
             console.error("WEB_APP_URL belum diatur.");
             showModal('Error Konfigurasi', 'WEB_APP_URL harus diisi. Harap ganti placeholder "URL_APPS_SCRIPT_DISINI" dengan URL Web App Anda yang berakhiran /exec.', 'error', 5000);
             return null;
@@ -866,7 +866,7 @@
 
 
     async function postData(payload) {
-        if (WEB_APP_URL === "https://script.google.com/macros/s/AKfycbztCAlxqc5p9fM4gKWy6dnR1s0mDoNxJGmx7UpSn0N8YJOsakA5J_-t0un1RddHM6KVqA/exec" || WEB_APP_URL === "") {
+        if (WEB_APP_URL === "" || WEB_APP_URL.includes("URL_APPS_SCRIPT_DISINI")) { // Hapus pengecekan yang salah
             showModal('Error Konfigurasi', 'WEB_APP_URL harus diisi. Harap ganti placeholder "URL_APPS_SCRIPT_DISINI" dengan URL Web App Anda yang berakhiran /exec.', 'error', 5000);
             return { status: 'error', message: 'WEB_APP_URL belum diatur.' };
         }
