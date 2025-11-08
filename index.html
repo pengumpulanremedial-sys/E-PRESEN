@@ -435,6 +435,7 @@
 
     const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1F72NOuTyeDYePeu5nLk_oLrvjecx-5iLCxj3cO57l1Y/edit";
     // GANTI URL INI DENGAN URL WEB APP DEPLOYMENT GOOGLE APPS SCRIPT ANDA!
+    // PENTING: GANTI DENGAN URL EXEC ANDA!
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzPg5mP0nt21c2_OBkZpi02NusNVwtUAqdBkyMxj8CKt6WGk-IPcTsy3TI-6mPysI1U/exec"; 
     
     let currentUser = null;
@@ -766,10 +767,11 @@
     // ====================================================================
 
     async function fetchData(endpointUrl) {
-        if (WEB_APP_URL === "") {
-            console.error("WEB_APP_URL belum diatur.");
-            showModal('Error Konfigurasi', 'WEB_APP_URL harus diisi. Harap ganti placeholder "" dengan URL Web App Anda yang berakhiran /exec.', 'error', 5000);
-            return null;
+        if (WEB_APP_URL.trim() === "" || WEB_APP_URL.includes("AKfycbzPg5mP0nt21c2_OBkZpi02NusNVwtUAqdBkyMxj8CKt6WGk-IPcTsy3TI-6mPysI1U")) {
+             // NEW: Error Handling untuk URL yang belum diganti
+             const errorMessage = `WEB_APP_URL is not defined or using placeholder. Harap ganti placeholder dengan URL Apps Script /exec yang benar.`;
+             console.error(errorMessage);
+             return { status: 'error', message: errorMessage };
         }
         
         const MAX_RETRIES = 3;
@@ -821,9 +823,11 @@
 
 
     async function postData(payload) {
-        if (WEB_APP_URL === "") {
-            showModal('Error Konfigurasi', 'WEB_APP_URL harus diisi. Harap ganti placeholder "" dengan URL Web App Anda yang berakhiran /exec.', 'error', 5000);
-            return { status: 'error', message: 'WEB_APP_URL belum diatur.' };
+        if (WEB_APP_URL.trim() === "" || WEB_APP_URL.includes("AKfycbzPg5mP0nt21c2_OBkZpi02NusNVwtUAqdBkyMxj8CKt6WGk-IPcTsy3TI-6mPysI1U")) {
+            // NEW: Error Handling untuk URL yang belum diganti
+            const errorMessage = `WEB_APP_URL is not defined or using placeholder. Harap ganti placeholder dengan URL Apps Script /exec yang benar.`;
+            console.error(errorMessage);
+            return { status: 'error', message: errorMessage };
         }
         
         const MAX_RETRIES = 3;
@@ -2606,8 +2610,8 @@
             else if (photo.status === 'Izin' || photo.status === 'Sakit') statusColor = 'border-amber-500 bg-amber-700/30 text-amber-300';
             else statusColor = 'border-rose-500 bg-rose-700/30 text-rose-400';
             
-            // Ensure photo.photo is a valid base64 string, otherwise use placeholder
-            const imgSrc = photo.photo && photo.photo.startsWith('data:image/') ? photo.photo : 'https://placehold.co/300x200/4f46e5/ffffff?text=NO+PHOTO';
+            // Photo.photo sekarang berisi URL Proxy yang mengarah ke serveFile
+            const imgSrc = photo.photo || 'https://placehold.co/300x200/4f46e5/ffffff?text=NO+PHOTO';
 
             return `
                 <div class="glass-container p-4 rounded-xl shadow-2xl space-y-3 modern-hover transition transform duration-300">
