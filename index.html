@@ -275,10 +275,12 @@
             
             <!-- Logo dan Nama Sekolah (Diperbarui untuk Estetika Modern) -->
             <div class="flex items-center space-x-3 order-1 md:order-1 w-full md:w-auto">
-                <img id="school-logo" class="h-10 w-auto rounded-full shadow-lg transition transform hover:scale-105" 
-                    src="https://placehold.co/40x40/ffffff/indigo?text=S" 
-                    onerror="this.onerror=null; this.src='https://placehold.co/40x40/ffffff/indigo?text=S';"
+                <!-- START PERBAIKAN 1: Ukuran Logo diubah dari h-10 menjadi h-12 -->
+                <img id="school-logo" class="h-12 w-auto rounded-full shadow-lg transition transform hover:scale-105" 
+                    src="https://placehold.co/48x48/ffffff/indigo?text=S" 
+                    onerror="this.onerror=null; this.src='https://placehold.co/48x48/ffffff/indigo?text=S';"
                     alt="Logo Sekolah">
+                <!-- END PERBAIKAN 1 -->
 
                 <h1 id="school-title-display" class="text-xl md:text-2xl font-extrabold tracking-tight cursor-default transition-colors duration-300 hover:text-indigo-200">
                     E-Absensi SMK Sehati Karawang
@@ -457,9 +459,10 @@
     // --- 1. CONFIGURATION & GLOBAL STATE ---
     // ====================================================================
     
+    // START PERBAIKAN 1: Ukuran placeholder logo disesuaikan (48x48)
     let APP_CONFIG = {
         SCHOOL_NAME: "E-Absensi SMK Sehati Karawang",
-        LOGO_URL: "https://placehold.co/40x40/ffffff/indigo?text=S"
+        LOGO_URL: "https://placehold.co/48x48/ffffff/indigo?text=S" 
     };
 
     const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1F72NOuTyeDYePeu5nLk_oLrvjecx-5iLCxj3cO57l1Y/edit";
@@ -939,10 +942,10 @@
             historyRecords = result.records;
         } else {
              if (result && result.message && result.message.includes('Aksi tidak dikenali.')) {
-                 console.error(`Gagal memuat riwayat absensi: Aksi "getStudentHistory" tidak dikenali di Apps Script.`);
-                 showModal('Konfigurasi Server', 'Error: Aksi "getStudentHistory" tidak dikenali. Harap update Code.gs dan Redeploy Apps Script sebagai Versi Baru!', 'error', 7000);
+                console.error(`Gagal memuat riwayat absensi: Aksi "getStudentHistory" tidak dikenali di Apps Script.`);
+                showModal('Konfigurasi Server', 'Error: Aksi "getStudentHistory" tidak dikenali. Harap update Code.gs dan Redeploy Apps Script sebagai Versi Baru!', 'error', 7000);
              } else {
-                 console.error(`Gagal memuat riwayat absensi: ${result ? result.message : 'Unknown Error'}`);
+                console.error(`Gagal memuat riwayat absensi: ${result ? result.message : 'Unknown Error'}`);
              }
         }
     }
@@ -1094,6 +1097,18 @@
     }
 
     function loadAppState() {
+        // START PERBAIKAN 2: Memuat konfigurasi aplikasi sebelum sesi pengguna
+        const savedConfig = localStorage.getItem('absensiAppConfig');
+        if (savedConfig) {
+            try {
+                APP_CONFIG = JSON.parse(savedConfig);
+            } catch (e) {
+                console.error("Gagal memuat konfigurasi aplikasi dari localStorage:", e);
+                localStorage.removeItem('absensiAppConfig');
+            }
+        }
+        // END PERBAIKAN 2
+        
         const savedState = localStorage.getItem('absensiAppState');
         if (savedState) {
             try {
@@ -1133,6 +1148,8 @@
         } else {
             localStorage.removeItem('absensiAppState');
         }
+        // NEW: Save App Configuration Permanently
+        localStorage.setItem('absensiAppConfig', JSON.stringify(APP_CONFIG));
     }
 
     function initializeDashboard(initialTab = null) {
@@ -2294,7 +2311,7 @@
                         </tbody>
                     </table>
                 </div>
-                                     <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
+                                             <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
                         <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Perubahan Data Massal
                     </button>
             </form>
@@ -3737,6 +3754,11 @@
             // Update local state and UI
             APP_CONFIG.SCHOOL_NAME = schoolName;
             APP_CONFIG.LOGO_URL = logoUrl;
+            
+            // START PERBAIKAN 2: Persist configuration immediately 
+            saveAppState(); // This now includes saving APP_CONFIG to localStorage
+            // END PERBAIKAN 2
+
             updateHeaderDisplay();
             
             showModal('Konfigurasi Berhasil', 'Nama sekolah dan URL logo berhasil diperbarui.', 'success', 3000);
@@ -3782,7 +3804,10 @@
     });
 
     document.addEventListener('DOMContentLoaded', () => {
-        updateHeaderDisplay();
+        // PERBAIKAN 2: Memuat status aplikasi dan konfigurasi
+        const loaded = loadAppState();
+        
+        updateHeaderDisplay(); // Pastikan header diperbarui dengan APP_CONFIG yang sudah dimuat
         
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
@@ -3790,7 +3815,6 @@
         
         renderRoleSelection();
 
-        const loaded = loadAppState();
         if (!loaded) {
             // Biarkan halaman login/pilihan peran ditampilkan
         }
