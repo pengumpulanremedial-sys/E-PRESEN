@@ -3827,7 +3827,7 @@
         const messageEl = document.getElementById('login-message');
         messageEl.classList.add('hidden');
 
-        showModal('Otentikasi', 'Memverifikasi kredensial...', 'loading');
+        showModal('Otentikasi', 'Memverifikasi akun anda...', 'loading');
 
         const url = `${WEB_APP_URL}?action=login&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&role=${currentRole}`;
         const result = await fetchData(url);
@@ -3884,6 +3884,7 @@
 </script>
 </body>
 </html>
+
 
 
 
