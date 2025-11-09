@@ -370,7 +370,8 @@
 
     <!-- Modal for Loading/Success Messages/Confirmation (Perbaikan 1) -->
     <div id="modal-message" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden transition-opacity duration-300">
-        <div id="modal-content" class="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full transform scale-100 transition-transform duration-300">
+        <!-- START PERBAIKAN 2: Tambahkan min-h-[180px] dan flex centering untuk stabilitas UI -->
+        <div id="modal-content" class="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full transform scale-100 transition-transform duration-300 min-h-[180px] flex flex-col justify-center items-center text-center">
             <div id="modal-icon" class="mb-4 text-indigo-600">
                 <!-- Icon will be placed here -->
             </div>
@@ -380,6 +381,7 @@
                 <!-- Buttons for confirmation/cancellation will be placed here by showConfirm -->
             </div>
         </div>
+        <!-- END PERBAIKAN 2 -->
     </div>
     
     <!-- NEW: Mini Pop-up for Apply All feature (Perbaikan Pop-up) -->
@@ -459,7 +461,6 @@
     // --- 1. CONFIGURATION & GLOBAL STATE ---
     // ====================================================================
     
-    // START PERBAIKAN 1: Ukuran placeholder logo disesuaikan (48x48)
     let APP_CONFIG = {
         SCHOOL_NAME: "E-Absensi SMK Sehati Karawang",
         LOGO_URL: "https://placehold.co/48x48/ffffff/indigo?text=S" 
@@ -636,14 +637,17 @@
         titleEl.innerText = title;
         titleEl.className = `text-xl font-bold mb-3 ${colorClass}`;
         
+        // Perbaikan: Hapus class centering yang ditambahkan saat modal dipanggil di sini
+        bodyEl.classList.remove('text-center');
+
         // PERBAIKAN KRITIS: Gunakan innerHTML jika tipe adalah 'image', jika tidak gunakan innerText
         if (type === 'image') {
             bodyEl.innerHTML = body; // RENDER HTML (termasuk tag <img>)
-            bodyEl.classList.add('text-center'); // Center image in modal
-            bodyEl.classList.remove('text-gray-600');
+            // Tambahkan kembali centering untuk image modal
+            document.getElementById('modal-content').classList.add('text-center'); 
         } else {
             bodyEl.innerText = body; // Render sebagai teks biasa (untuk notif)
-            bodyEl.classList.remove('text-center');
+            document.getElementById('modal-content').classList.remove('text-center');
             bodyEl.classList.add('text-gray-600');
         }
 
@@ -843,11 +847,15 @@
                     }
                     return result; // Success, break out of loop
                 } catch (e) {
-                    if (text.includes('Absensi berhasil disimpan.') || text.includes('Pembaruan nilai berhasil.')) {
+                    if (text.includes('Absensi berhasil disimpan.') || text.includes('Pembaruan nilai berhasil.') || text.includes('konfigurasi berhasil disimpan.')) {
                         return { status: 'success', message: text };
                     }
                     if (text.startsWith('Error:')) {
                         throw new Error(text);
+                    }
+                    // Jika endpoint getAppConfiguration belum diimplementasikan di Apps Script, akan error. Kita tangani.
+                    if (endpointUrl.includes('action=getAppConfiguration')) {
+                        return { status: 'error', message: 'Fungsi getAppConfiguration belum diimplementasikan atau Gagal parsing JSON respons.' };
                     }
                     throw new Error('Respon server tidak terduga, bukan JSON: ' + text);
                 }
@@ -914,6 +922,29 @@
             }
         }
     }
+    
+    // START PERBAIKAN 1: Logika memuat konfigurasi pusat
+    async function fetchAppConfigurationFromCentral() {
+        const url = `${WEB_APP_URL}?action=getAppConfiguration`;
+        const result = await fetchData(url);
+        
+        if (result && result.status === 'success' && result.config && result.config.schoolName) {
+            // CENTRAL CONFIG FOUND: Update local state to reflect central setting
+            APP_CONFIG.SCHOOL_NAME = result.config.schoolName;
+            APP_CONFIG.LOGO_URL = result.config.logoUrl;
+            
+            // Simpan ke local storage untuk cache dan sinkronisasi awal
+            localStorage.setItem('absensiAppConfig', JSON.stringify(APP_CONFIG));
+            console.log("Konfigurasi aplikasi dimuat dari pusat.");
+            return true;
+        }
+        
+        // CENTRAL CONFIG NOT FOUND/FAILED: Fall back to local only (already loaded via loadAppState)
+        console.warn("Gagal memuat konfigurasi pusat, menggunakan cache/default.");
+        return false;
+    }
+    // END PERBAIKAN 1
+
 
     // ====================================================================
     // --- CORE STUDENT DATA FETCH HANDLERS (Moved to ensure definition before call) ---
@@ -1097,7 +1128,7 @@
     }
 
     function loadAppState() {
-        // START PERBAIKAN 2: Memuat konfigurasi aplikasi sebelum sesi pengguna
+        // PERBAIKAN 2: Memuat konfigurasi aplikasi dari local storage sebagai FALLBACK/CACHE
         const savedConfig = localStorage.getItem('absensiAppConfig');
         if (savedConfig) {
             try {
@@ -1107,15 +1138,12 @@
                 localStorage.removeItem('absensiAppConfig');
             }
         }
-        // END PERBAIKAN 2
         
         const savedState = localStorage.getItem('absensiAppState');
         if (savedState) {
             try {
                 const state = JSON.parse(savedState);
                 
-                // PERBAIKAN BUG REFRESH: Hapus pengecekan tanggal harian yang agresif.
-                // Sesi akan dipertahankan selama user belum logout.
                 if (state.user && state.role && state.tab) {
                     currentUser = state.user;
                     currentRole = state.role;
@@ -1148,7 +1176,7 @@
         } else {
             localStorage.removeItem('absensiAppState');
         }
-        // NEW: Save App Configuration Permanently
+        // NEW: Save App Configuration Permanently (local cache)
         localStorage.setItem('absensiAppConfig', JSON.stringify(APP_CONFIG));
     }
 
@@ -3741,6 +3769,7 @@
 
         showModal('Menyimpan Konfigurasi', 'Mengirim data konfigurasi ke server...', 'loading', 0);
 
+        // Payload ini dikirim ke Apps Script untuk disimpan secara sentral
         const payload = new URLSearchParams({
             action: 'saveAppConfiguration',
             schoolName: schoolName,
@@ -3751,19 +3780,30 @@
         hideModal();
 
         if (result && result.status === 'success') {
-            // Update local state and UI
+            // 1. Update local state
             APP_CONFIG.SCHOOL_NAME = schoolName;
             APP_CONFIG.LOGO_URL = logoUrl;
             
-            // START PERBAIKAN 2: Persist configuration immediately 
-            saveAppState(); // This now includes saving APP_CONFIG to localStorage
-            // END PERBAIKAN 2
+            // 2. Simpan ke local cache dan sesi user
+            saveAppState(); 
 
+            // 3. Update UI
             updateHeaderDisplay();
             
-            showModal('Konfigurasi Berhasil', 'Nama sekolah dan URL logo berhasil diperbarui.', 'success', 3000);
+            // Perbaikan: Konfirmasi pesan untuk sinkronisasi berhasil
+            showModal('Konfigurasi Berhasil', 'Nama sekolah dan URL logo berhasil diperbarui secara permanen (melalui Apps Script) dan ke cache lokal.', 'success', 3000);
         } else {
-            showModal('Penyimpanan Gagal', result ? result.message : 'Terjadi kesalahan saat menyimpan konfigurasi. Pastikan fungsi Apps Script **saveAppConfiguration** sudah di-redeploy.', 'error', 5000);
+            // Jika Apps Script gagal (bukan Apps Script Crash), coba update lokal sebagai fallback
+            if (result && result.message && !result.message.includes('Apps Script Server Crash')) {
+                // Update local cache for quick fixes until server is fixed
+                APP_CONFIG.SCHOOL_NAME = schoolName;
+                APP_CONFIG.LOGO_URL = logoUrl;
+                saveAppState(); 
+                updateHeaderDisplay();
+                showModal('Peringatan Server', `Konfigurasi tersimpan lokal, tetapi gagal disimpan ke server pusat. Error: ${result.message}`, 'error', 7000);
+            } else {
+                showModal('Penyimpanan Gagal', result ? result.message : 'Terjadi kesalahan saat menyimpan konfigurasi. Pastikan fungsi Apps Script **saveAppConfiguration** sudah di-redeploy.', 'error', 5000);
+            }
         }
     }
 
@@ -3803,21 +3843,22 @@
         }
     });
 
-    document.addEventListener('DOMContentLoaded', () => {
-        // PERBAIKAN 2: Memuat status aplikasi dan konfigurasi
-        const loaded = loadAppState();
+    document.addEventListener('DOMContentLoaded', async () => {
+        // 1. Muat konfigurasi dari local storage (untuk tampilan instan/cache)
+        loadAppState();
+        updateHeaderDisplay();
         
-        updateHeaderDisplay(); // Pastikan header diperbarui dengan APP_CONFIG yang sudah dimuat
-        
+        // 2. Coba memuat konfigurasi dari server pusat (untuk sinkronisasi lintas perangkat)
+        await fetchAppConfigurationFromCentral();
+        updateHeaderDisplay(); // Terapkan hasil konfigurasi pusat (jika berhasil)
+
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
         
         renderRoleSelection();
 
-        if (!loaded) {
-            // Biarkan halaman login/pilihan peran ditampilkan
-        }
+        // Jika loadAppState berhasil memuat sesi user, initializeDashboard sudah dipanggil.
     });
     
     setInterval(updateTime, 1000);
