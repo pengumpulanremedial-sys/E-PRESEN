@@ -172,7 +172,7 @@
                 -webkit-backdrop-filter: none !important;
             }
             /* Reset warna elemen tabel agar terlihat jelas saat dicetak */
-            .glass-container table, .glass-container thead, .glass-container tbody, .glass-container tr, .glass-container td, .glass-container th {
+            .glass-container table, .glass-container thead, .glass-container tbody, .glass-container table, .glass-container td, .glass-container th {
                 background-color: white !important;
                 color: black !important;
                 border-color: #ccc !important;
@@ -371,7 +371,8 @@
     <!-- Modal for Loading/Success Messages/Confirmation (Perbaikan 1) -->
     <div id="modal-message" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden transition-opacity duration-300">
         <!-- START PERBAIKAN 2: Tambahkan min-h-[180px] dan flex centering untuk stabilitas UI -->
-        <div id="modal-content" class="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full transform scale-100 transition-transform duration-300 min-h-[180px] flex flex-col justify-center items-center text-center">
+        <!-- PERBAIKAN FOTO: Ubah max-w-sm ke max-w-3xl, tambahkan max-h-[90vh] dan overflow-y-auto untuk skenario foto agar tombol "Tutup" tidak terpotong. Hapus class flex dan center, akan dikelola oleh JS. -->
+        <div id="modal-content" class="bg-white p-8 rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto transform scale-100 transition-transform duration-300 min-h-[180px]">
             <div id="modal-icon" class="mb-4 text-indigo-600">
                 <!-- Icon will be placed here -->
             </div>
@@ -603,6 +604,7 @@
     
     function showModal(title, body, type, duration = 0, customIcon = null) {
         const modal = document.getElementById('modal-message');
+        const contentEl = document.getElementById('modal-content'); // Get content element
         const iconDiv = document.getElementById('modal-icon');
         const titleEl = document.getElementById('modal-title');
         const bodyEl = document.getElementById('modal-body'); // <--- PENTING: bodyEl sekarang diisi dengan HTML
@@ -614,40 +616,52 @@
 
         let iconHtml = '';
         let colorClass = 'text-indigo-600';
+        
+        // PERBAIKAN FOTO: Atur ulang tata letak konten modal
+        contentEl.classList.remove('flex', 'flex-col', 'justify-center', 'items-center', 'text-left');
+        contentEl.classList.add('text-center'); // Default centering for icon/title
 
         if (type === 'loading') {
             iconHtml = `<div class="animate-spin"><span data-lucide="loader-circle" class="w-10 h-10 mx-auto"></span></div>`;
             colorClass = 'text-indigo-600';
-        } else if (type === 'success') {
-            iconHtml = `<span data-lucide="${customIcon || 'check-circle'}" class="w-10 h-10 mx-auto text-emerald-500"></span>`;
-            colorClass = 'text-emerald-500';
-        } else if (type === 'error') {
-            iconHtml = `<span data-lucide="${customIcon || 'x-circle'}" class="w-10 h-10 mx-auto text-red-500"></span>`;
-            colorClass = 'text-red-500';
-        } else if (type === 'info') {
-             iconHtml = `<span data-lucide="${customIcon || 'info'}" class="w-10 h-10 mx-auto text-blue-500"></span>`;
-            colorClass = 'text-blue-500';
-        } else if (type === 'image') { // <--- NEW TYPE: Untuk modal foto
+            contentEl.classList.add('flex', 'flex-col', 'justify-center', 'items-center'); // Center for loading
+        } else if (type === 'success' || type === 'error' || type === 'info') {
+            const iconMap = {
+                success: customIcon || 'check-circle',
+                error: customIcon || 'x-circle',
+                info: customIcon || 'info'
+            };
+            const colorMap = {
+                success: 'text-emerald-500',
+                error: 'text-red-500',
+                info: 'text-blue-500'
+            };
+            iconHtml = `<span data-lucide="${iconMap[type]}" class="w-10 h-10 mx-auto ${colorMap[type]}"></span>`;
+            colorClass = colorMap[type];
+            contentEl.classList.add('flex', 'flex-col', 'justify-center', 'items-center'); // Center for status
+        } else if (type === 'image') { // Modal Foto: Biarkan konten mengalir sebagai blok
             iconHtml = `<span data-lucide="${customIcon || 'image'}" class="w-10 h-10 mx-auto text-indigo-600"></span>`;
             colorClass = 'text-indigo-600';
+            // Biarkan sebagai blok biasa
         }
-
 
         iconDiv.innerHTML = iconHtml;
         titleEl.innerText = title;
         titleEl.className = `text-xl font-bold mb-3 ${colorClass}`;
         
-        // Perbaikan: Hapus class centering yang ditambahkan saat modal dipanggil di sini
-        bodyEl.classList.remove('text-center');
+        // Pastikan body memiliki warna teks yang benar
+        bodyEl.classList.remove('text-center', 'text-gray-600'); 
 
         // PERBAIKAN KRITIS: Gunakan innerHTML jika tipe adalah 'image', jika tidak gunakan innerText
         if (type === 'image') {
             bodyEl.innerHTML = body; // RENDER HTML (termasuk tag <img>)
-            // Tambahkan kembali centering untuk image modal
-            document.getElementById('modal-content').classList.add('text-center'); 
+            // Khusus untuk foto, kita ingin teks detail foto align kiri
+            contentEl.classList.remove('text-center'); 
+            contentEl.classList.add('text-left');
         } else {
             bodyEl.innerText = body; // Render sebagai teks biasa (untuk notif)
-            document.getElementById('modal-content').classList.remove('text-center');
+            contentEl.classList.remove('text-left');
+            contentEl.classList.add('text-center');
             bodyEl.classList.add('text-gray-600');
         }
 
@@ -666,6 +680,7 @@
     
     function showConfirm(title, body, onConfirm) {
         const modal = document.getElementById('modal-message');
+        const contentEl = document.getElementById('modal-content');
         const iconDiv = document.getElementById('modal-icon');
         const titleEl = document.getElementById('modal-title');
         const bodyEl = document.getElementById('modal-body');
@@ -673,6 +688,10 @@
         
         hideMiniPopup();
         
+        // PERBAIKAN: Pastikan modal terpusat untuk konfirmasi
+        contentEl.classList.remove('text-left');
+        contentEl.classList.add('flex', 'flex-col', 'justify-center', 'items-center', 'text-center');
+
         // Setup content
         iconDiv.innerHTML = `<span data-lucide="alert-triangle" class="w-10 h-10 mx-auto text-amber-500"></span>`;
         titleEl.innerText = title;
@@ -1417,7 +1436,10 @@
                         beginAtZero: true, 
                         title: { display: true, text: 'Jumlah Siswa', font: { size: 14 }, color: '#e5e7eb' },
                         ticks: { stepSize: 1, callback: (v) => Number.isInteger(v) ? v : null, font: { size: 13 }, color: '#e5e7eb' }, 
-                        grid: { drawBorder: false, color: 'rgba(255, 255, 255, 0.15)' } 
+                        grid: { 
+                            drawBorder: false, 
+                            color: 'rgba(255, 255, 255, 0.15)' 
+                        } 
                     },
                     x: { 
                         title: { display: true, text: 'Kelas/Jurusan', font: { size: 14 }, color: '#e5e7eb' },
@@ -2033,418 +2055,48 @@
     }
 
     function showPhotoModal(nama, photoUrl, nisn, kelasJurusan, date, time) {
-        let photoBody;
+        let photoBodyContent;
+        let photoTitle = `Foto Kehadiran: ${nama}`;
+
+        const placeholder = 'https://placehold.co/500x400/4f46e5/ffffff?text=FOTO+Gagal+Dimuat';
+        const imageUrl = photoUrl && (photoUrl.startsWith('http') || photoUrl.startsWith('https')) ? photoUrl : placeholder;
 
         if (photoUrl && (photoUrl.startsWith('http') || photoUrl.startsWith('https'))) {
-            // PERBAIKAN: Memastikan tag <img> dirender di dalam modal
-            photoBody = `
-                <img src="${photoUrl}" 
-                    onerror="this.onerror=null; this.src='https://placehold.co/500x400/4f46e5/ffffff?text=FOTO+Gagal+Dimuat';"
-                    class="w-full h-auto rounded-lg shadow-xl mb-4" 
-                    alt="Foto Kehadiran ${nama}">
-                <div class="text-left text-sm text-gray-700 space-y-1">
+            // New structure: Image in a constrained wrapper, details, and the close button at the bottom.
+            // Image is constrained with max-height to ensure the modal fits the screen (max-h-5/6, approx. 65vh)
+            photoBodyContent = `
+                <!-- Image Container with max height and centered image -->
+                <div class="relative w-full mb-4 flex justify-center items-center rounded-lg overflow-hidden" style="max-height: 65vh;">
+                    <img src="${imageUrl}" 
+                        onerror="this.onerror=null; this.src='${placeholder}';"
+                        class="w-full h-auto object-contain" 
+                        style="max-height: 65vh; display: block;"
+                        alt="Foto Kehadiran ${nama}">
+                </div>
+                <!-- Details -->
+                <div class="text-left text-sm text-gray-700 space-y-1 mb-6 border-t border-gray-200 pt-4">
                     <p><strong>Status:</strong> ${date} | ${time} WIB</p>
                     <p><strong>NISN:</strong> ${nisn}</p>
                     <p><strong>Kelas/Jurusan:</strong> ${kelasJurusan}</p>
                 </div>
-                <button onclick="hideModal()" class="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-200">Tutup</button>
+                <!-- Close Button - positioned inside modal-body to scroll with content -->
+                <div class="w-full flex justify-center">
+                    <button onclick="hideModal()" class="w-full max-w-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-200">Tutup Galeri</button>
+                </div>
             `;
         } else {
-            photoBody = `
+            // Fallback for invalid URL
+            photoBodyContent = `
                 <p class="text-red-500 font-semibold mb-4">URL Foto Tidak Valid:</p>
                 <p class="text-gray-600 break-words">${photoUrl || 'URL Kosong'}</p>
-                <button onclick="hideModal()" class="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-200">Tutup</button>
+                <div class="w-full flex justify-center mt-6">
+                    <button onclick="hideModal()" class="w-full max-w-xs bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-200">Tutup</button>
+                </div>
             `;
         }
 
-
-        showModal(`Foto Kehadiran: ${nama}`, photoBody, 'image');
-    }
-    
-    function renderTeacherStudentAttendance() {
-        const currentDate = new Date().toISOString().split('T')[0];
-
-        return `
-            <h3 class="text-2xl font-bold text-white mb-6">Input / Edit Absensi Siswa (Manual)</h3>
-            <div class="glass-element p-5 rounded-lg shadow-inner mb-6 print-hidden">
-                <form id="manual-attendance-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div>
-                        <label for="manual-kelas" class="block text-sm font-medium text-white/90">Kelas</label>
-                        <select id="manual-kelas" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Pilih Kelas --</option>
-                            ${currentUser.kelasAjar ? currentUser.kelasAjar.map(c => `<option value="${c}" class="bg-indigo-700">${c}</option>`).join('') : `<option value="" class="bg-indigo-700">(Data Kelas tidak tersedia)</option>`}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="manual-jurusan" class="block text-sm font-medium text-white/90">Jurusan</label>
-                        <select id="manual-jurusan" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Pilih Jurusan --</option>
-                            ${currentUser.jurusanAjar ? currentUser.jurusanAjar.map(j => `<option value="${j}" class="bg-indigo-700">${j}</option>`).join('') : `<option value="" class="bg-indigo-700">(Data Jurusan tidak tersedia)</option>`}
-                        </select>
-                    </div>
-                     <div>
-                        <label for="manual-date" class="block text-sm font-medium text-white/90">Tanggal Absensi</label>
-                        <input type="date" id="manual-date" value="${currentDate}" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
-                    </div>
-                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
-                        <span data-lucide="list-checks" class="w-4 h-4 mr-2"></span> Load Siswa
-                    </button>
-                </form>
-            </div>
-            
-            <div id="manual-attendance-area" class="mt-8">
-                            <p id="manual-message" class="text-center text-white/70 py-10">Pilih Kelas, Jurusan, dan Tanggal untuk memuat daftar siswa.</p>
-                            
-                            <!-- Student List Table (will be populated dynamically) -->
-                            <form id="manual-attendance-submit-form" class="hidden">
-                            <div id="student-list-container" class="overflow-x-auto rounded-lg shadow-lg border border-white/30 mb-6">
-                                <table class="min-w-full divide-y divide-white/20">
-                                    <thead class="glass-element">
-                                        <tr>
-                                            <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">NISN</th>
-                                            <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Nama Siswa</th>
-                                            <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Status</th>
-                                            <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Keterangan</th>
-                                            <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider print-hidden">Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="student-list-body" class="bg-white/10 divide-y divide-white/20">
-                                        <!-- Student rows here -->
-                                    </tbody>
-                                </table>
-                            </div>
-                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
-                                <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Absensi Massal
-                            </button>
-                            </form>
-            </div>
-        `;
-    }
-
-    function renderTeacherAssessment() {
-        const currentDate = new Date().toISOString().split('T')[0];
-
-        return `
-            <h3 class="text-2xl font-bold text-white mb-6 flex items-center"><span data-lucide="file-plus" class="w-6 h-6 mr-2"></span> Input Penilaian Siswa</h3>
-            <p class="text-white/90 mb-6">Input nilai akan diperbarui ke Google Sheet.</p>
-            <div class="glass-element p-5 rounded-xl shadow-inner mb-6 print-hidden">
-                <form id="assessment-load-form" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                    <div>
-                        <label for="assessment-type" class="block text-sm font-medium text-white/90">Jenis Penilaian</label>
-                        <select id="assessment-type" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-green-500 focus:border-green-500 glass-element">
-                            <option value="harian" class="bg-indigo-700">Penilaian Harian</option>
-                            <option value="pts" class="bg-indigo-700">Penilaian Tengah Semester (PTS)</option>
-                            <option value="pas" class="bg-indigo-700">Penilaian Akhir Semester (PAS)</option>
-                        </select>
-                    </div>
-                    <div id="assessment-date-group">
-                        <label for="assessment-date" class="block text-sm font-medium text-white/90">Tanggal Penilaian</label>
-                        <input type="date" id="assessment-date" value="${currentDate}" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-green-500 focus:border-green-500 glass-element">
-                    </div>
-                    <div>
-                        <label for="assessment-kelas" class="block text-sm font-medium text-white/90">Kelas</label>
-                        <select id="assessment-kelas" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-green-500 focus:border-green-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Pilih Kelas --</option>
-                            ${currentUser.kelasAjar ? currentUser.kelasAjar.map(c => `<option value="${c}" class="bg-indigo-700">${c}</option>`).join('') : `<option value="" class="bg-indigo-700">(Data Kelas tidak tersedia)</option>`}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="assessment-jurusan" class="block text-sm font-medium text-white/90">Jurusan</label>
-                        <select id="assessment-jurusan" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-green-500 focus:border-green-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Pilih Jurusan --</option>
-                            ${currentUser.jurusanAjar ? currentUser.jurusanAjar.map(j => `<option value="${j}" class="bg-indigo-700">${j}</option>`).join('') : `<option value="" class="bg-indigo-700">(Data Jurusan tidak tersedia)</option>`}
-                        </select>
-                    </div>
-                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
-                        <span data-lucide="file-text" class="w-4 h-4 mr-2"></span> Muat Penilaian
-                    </button>
-                </form>
-            </div>
-            
-            <div id="assessment-area" class="mt-8">
-                <p id="assessment-message" class="text-center text-white/70 py-10">Pilih jenis penilaian, Kelas, dan Jurusan untuk memuat daftar siswa.</p>
-                
-                <form id="assessment-submit-form" class="hidden">
-                    <div id="assessment-student-list-container" class="overflow-x-auto rounded-lg shadow-lg border border-white/30 mb-6">
-                        <table class="min-w-full divide-y divide-white/20">
-                            <thead class="glass-element">
-                                <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">NISN</th>
-                                    <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Nama Siswa</th>
-                                    <th id="assessment-score-label" class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Nilai (0-100)</th>
-                                    <th class="px-4 py-3 text-left text-xs font-bold text-white uppercase tracking-wider print-hidden">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody id="assessment-student-list-body" class="bg-white/10 divide-y divide-white/20">
-                                <!-- Student rows here -->
-                            </tbody>
-                        </table>
-                    </div>
-                    <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
-                        <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Nilai Massal
-                    </button>
-                </form>
-            </div>
-        `;
-    }
-
-    function renderAdminConfiguration() {
-        return `
-            <h3 class="text-2xl font-bold text-white mb-6">Konfigurasi Aplikasi</h3>
-            <p class="text-white/90 mb-6">Perbarui detail sekolah yang ditampilkan di header aplikasi.</p>
-            <div class="glass-element p-6 rounded-lg shadow-inner mb-8 print-hidden">
-                <form id="admin-config-form" class="space-y-6">
-                    <div>
-                        <label for="config-school-name" class="block text-sm font-medium text-white/90">Nama Sekolah</label>
-                        <input type="text" id="config-school-name" value="${APP_CONFIG.SCHOOL_NAME}" required placeholder="Contoh: SMK Sehati Karawang" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
-                    </div>
-                    <div>
-                        <label for="config-logo-url" class="block text-sm font-medium text-white/90">URL Logo Sekolah (Link Langsung)</label>
-                        <input type="url" id="config-logo-url" value="${APP_CONFIG.LOGO_URL}" required placeholder="Contoh: https://link-gambar-logo-anda.png" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
-                        <p class="text-xs text-white/70 mt-1">Gunakan link langsung (Direct Link) atau string Base64 di bawah.</p>
-                    </div>
-                    <div class="flex justify-end">
-                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center transition duration-200 modern-hover">
-                            <span data-lucide="save" class="w-4 h-4 mr-2"></span> Simpan Konfigurasi
-                        </button>
-                    </div>
-                </form>
-            </div>
-
-            <div class="glass-element p-6 rounded-lg shadow-md space-y-4 print-hidden">
-                <h4 class="text-lg font-bold text-white">Opsi Alternatif: Logo Base64</h4>
-                <div>
-                    <label for="config-logo-base64" class="block text-sm font-medium text-white/90">Tempel String Base64 Gambar</label>
-                    <textarea id="config-logo-base64" rows="3" placeholder="Contoh: data:image/png;base64,iVBORw0goAAAAN..." class="w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 resize-none glass-element"></textarea>
-                </div>
-                <button id="apply-base64-btn" type="button" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md flex items-center transition duration-200 modern-hover">
-                    <span data-lucide="image" class="w-4 h-4 mr-2"></span> Terapkan Logo dari Base64
-                </button>
-            </div>
-        `;
-    }
-
-    function renderAdminGlobalRecap() {
-        const allClasses = currentUser.kelasAjar || [];
-        const allMajors = currentUser.jurusanAjar || []; // DIPERBAIKI: Menggunakan jurusanAjar untuk Jurusan
-
-        return `
-            <h3 class="text-2xl font-bold text-white mb-6">Rekapitulasi Global Absensi Siswa (Detail Harian)</h3>
-            <div class="glass-element p-5 rounded-lg shadow-inner mb-6 print-hidden">
-                <form id="admin-recap-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div>
-                        <label for="admin-rekap-kelas" class="block text-sm font-medium text-white/90">Kelas</label>
-                        <select id="admin-rekap-kelas" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Semua Kelas --</option>
-                            ${allClasses.map(c => `<option value="${c}" class="bg-indigo-700">${c}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="admin-rekap-jurusan" class="block text-sm font-medium text-white/90">Jurusan</label>
-                        <select id="admin-rekap-jurusan" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Semua Jurusan --</option>
-                            ${allMajors.map(j => `<option value="${j}" class="bg-indigo-700">${j}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="admin-rekap-periode" class="block text-sm font-medium text-white/90">Periode</label>
-                        <select id="admin-rekap-periode" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 glass-element">
-                            <option value="harian" class="bg-indigo-700">Harian</option>
-                            <option value="mingguan" class="bg-indigo-700">Mingguan</option>
-                            <option value="bulanan" class="bg-indigo-700">Bulanan</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center h-10 transition duration-200 modern-hover">
-                        <span data-lucide="search" class="w-4 h-4 mr-2"></span> Tampilkan Data
-                    </button>
-                </form>
-            </div>
-            
-            <div id="admin-recap-results" class="hidden">
-                ${generateRecapResultsTemplate('admin-recap-chart')}
-            </div>
-            <div id="admin-recap-message" class="text-center text-white/70 py-10">Silahkan pilih filter untuk melihat rekap data.</div>
-        `;
-    }
-
-    function renderAdminManagement() {
-        const allClasses = currentUser.kelasAjar || [];
-        const allMajors = currentUser.jurusanAjar || [];
-        
-        return `
-            <h3 class="text-2xl font-bold text-white mb-6">Manajemen Data Siswa</h3>
-            <p class="text-white/90 mb-6">Kelola data siswa, termasuk penambahan, pengeditan, dan penghapusan massal.</p>
-            <div class="glass-element p-5 rounded-lg shadow-inner mb-6 print-hidden">
-                <form id="admin-management-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div class="md:col-span-2">
-                        <label for="admin-search-student" class="block text-sm font-medium text-white/90">Cari NISN/Nama</label>
-                        <input type="text" id="admin-search-student" placeholder="Ketik NISN atau Nama Siswa" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
-                    </div>
-                    <div>
-                        <label for="admin-filter-kelas" class="block text-sm font-medium text-white/90">Kelas</label>
-                        <select id="admin-filter-kelas" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Semua Kelas --</option>
-                            ${allClasses.map(c => `<option value="${c}" class="bg-indigo-700">${c}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="admin-filter-jurusan" class="block text-sm font-medium text-white/90">Jurusan</label>
-                        <select id="admin-filter-jurusan" class="mt-1 w-full px-3 py-2 border border-white/30 rounded-lg focus:ring-purple-500 focus:border-purple-500 glass-element">
-                            <option value="" class="bg-indigo-700">-- Semua Jurusan --</option>
-                            ${allMajors.map(j => `<option value="${j}" class="bg-indigo-700">${j}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div class="col-span-1 md:col-span-4 flex justify-end">
-                               <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-6 rounded-lg flex items-center justify-center transition duration-200 modern-hover">
-                                   <span data-lucide="filter" class="w-4 h-4 mr-2"></span> Terapkan Filter
-                               </button>
-                    </div>
-                </form>
-            </div>
-            
-            <p id="admin-management-message" class="text-center text-white/70 py-10">Memuat data siswa...</p>
-            
-            <form id="admin-student-update-form" class="hidden">
-                                         <div class="flex flex-col space-y-3 md:flex-row justify-between items-center mb-4 md:space-y-0 print-hidden">
-                                         <button type="button" onclick="openAddStudentModal()" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center transition duration-200 modern-hover">
-                                             <span data-lucide="user-plus" class="w-4 h-4 mr-2"></span> Tambah Siswa Baru
-                                         </button>
-                                         
-                                         <div class="flex space-x-3 w-full md:w-auto">
-                                             <button onclick="openGoogleSheetLink()" type="button" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center transition duration-200 modern-hover">
-                                                 <span data-lucide="external-link" class="w-4 h-4 mr-2"></span> Edit Data di Sheet
-                                             </button>
-                                             <!-- NEW BULK DELETE BUTTON (Perbaikan 3) -->
-                                             <button onclick="handleDeleteFilteredStudents()" type="button" id="bulk-delete-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center shadow-md justify-center disabled:opacity-50" disabled>
-                                                 <span data-lucide="trash-2" class="w-4 h-4 mr-2"></span> Hapus Berdasarkan Filter (<span id="filtered-count">0</span>)
-                                             </button>
-                                         </div>
-                                         </div>
-
-                <div id="admin-student-list-container" class="overflow-x-auto rounded-lg shadow-lg border border-white/30 mb-6">
-                    <table class="min-w-full divide-y divide-white/20">
-                        <thead class="glass-element">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">NISN (KEY)</th>
-                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Nama Siswa</th>
-                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Kelas</th>
-                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Jurusan</th>
-                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider">Email</th>
-                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider print-hidden">Password</th>
-                                <th class="px-6 py-3 text-left text-xs font-bold text-white uppercase tracking-wider print-hidden">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody id="admin-student-list-body" class="bg-white/10 divide-y divide-white/20">
-                            <!-- Student rows here -->
-                        </tbody>
-                    </table>
-                </div>
-                                             <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
-                        <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Perubahan Data Massal
-                    </button>
-            </form>
-        `;
-    }
-
-    // ====================================================================
-    // --- 7. HANDLER & LISTENER FUNCTIONS (Logic Interaktif) ---
-    // ====================================================================
-
-    // --- Camera/Photo Capture Logic ---
-
-    function stopCamera() {
-        if (mediaStream) {
-            mediaStream.getTracks().forEach(track => track.stop());
-            mediaStream = null;
-            if (videoElement) {
-                videoElement.srcObject = null;
-                // Optional cleanup for UI elements
-                videoElement.classList.add('hidden');
-                document.getElementById('video-fallback').classList.remove('hidden');
-            }
-        }
-    }
-
-    async function startCamera() {
-        // Assign elements to global variables inside this function as they are rendered dynamically
-        videoElement = document.getElementById('video-stream');
-        canvasElement = document.getElementById('photo-canvas');
-        photoDataInput = document.getElementById('photo-data');
-        photoPreview = document.getElementById('photo-preview');
-        captureButton = document.getElementById('capture-photo-btn');
-        const fallbackDiv = document.getElementById('video-fallback');
-        
-        if (!videoElement || !canvasElement || !captureButton) return;
-
-        // Reset state
-        photoPreview.classList.add('hidden');
-        photoPreview.src = '';
-        photoDataInput.value = '';
-        captureButton.removeAttribute('disabled');
-        videoElement.classList.add('hidden');
-        fallbackDiv.classList.remove('hidden');
-        document.getElementById('photo-status').textContent = 'Tekan "Ambil Foto" untuk verifikasi wajah.';
-
-
-        try {
-            stopCamera(); // Ensure previous stream is stopped
-            
-            mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: "user" // Use front camera
-                },
-                audio: false
-            });
-            
-            videoElement.srcObject = mediaStream;
-            videoElement.classList.remove('hidden');
-            fallbackDiv.classList.add('hidden');
-
-            // Wait for video metadata to load
-            await new Promise(resolve => {
-                videoElement.onloadedmetadata = () => {
-                    videoElement.play();
-                    resolve();
-                };
-            });
-
-            captureButton.onclick = capturePhoto;
-            
-        } catch (err) {
-            console.error("Error accessing camera: ", err);
-            videoElement.classList.add('hidden');
-            fallbackDiv.classList.remove('hidden');
-            fallbackDiv.innerHTML = '<span class="text-red-400">Gagal mengakses kamera. Harap izinkan akses.</span>';
-            captureButton.setAttribute('disabled', 'disabled');
-            document.getElementById('photo-status').innerHTML = '<span class="text-red-400 font-semibold">Kamera tidak aktif. Absensi tidak dapat dilanjutkan.</span>';
-        }
-    }
-
-    function capturePhoto() {
-        if (!videoElement || !canvasElement || !mediaStream || captureButton.hasAttribute('disabled')) {
-            showModal('Kamera Belum Aktif', 'Harap tunggu kamera aktif, izinkan akses, atau refresh halaman.', 'error', 3000);
-            return;
-        }
-
-        // Set canvas dimensions to video dimensions
-        canvasElement.width = videoElement.videoWidth;
-        canvasElement.height = videoElement.videoHeight;
-
-        const ctx = canvasElement.getContext('2d');
-        ctx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
-
-        // Convert canvas image to Base64 JPEG format (compressed for efficiency)
-        const base64Data = canvasElement.toDataURL('image/jpeg', 0.8); // 80% quality
-
-        // Update hidden input and preview
-        photoDataInput.value = base64Data;
-        photoPreview.src = base64Data;
-        photoPreview.classList.remove('hidden');
-        videoElement.classList.add('hidden');
-        document.getElementById('video-fallback').classList.add('hidden'); // Hide fallback just in case
-        
-        captureButton.setAttribute('disabled', 'disabled'); // Prevent re-capture until submission
-        document.getElementById('photo-status').innerHTML = '<span class="text-emerald-300 font-semibold">Foto berhasil diambil! Lanjutkan isi absensi.</span>';
+        // Use a generic title and pass the constructed photo body which now includes the close button
+        showModal(photoTitle, photoBodyContent, 'image');
     }
     
     // --- Student Handlers (Updated) ---
@@ -3884,11 +3536,3 @@
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
