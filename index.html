@@ -3072,19 +3072,24 @@
     }
 
     async function handleSingleManualAttendanceUpdate(nisn) {
+        // Ambil form secara spesifik
         const form = document.getElementById('manual-attendance-submit-form');
         if (!form) return;
 
-        const status = form.querySelector(`select[name="status_${nisn}"]`).value;
+        const statusSelect = form.querySelector(`select[name="status_${nisn}"]`);
         const keteranganInput = form.querySelector(`textarea[name="keterangan_${nisn}"]`);
         
-        let keterangan = keteranganInput.value.trim();
+        if (!statusSelect) return;
+
+        const status = statusSelect.value;
+        let keterangan = keteranganInput ? keteranganInput.value.trim() : '';
+        
         const nama = form.querySelector(`input[name="nama_${nisn}"]`).value;
         const kelas = form.querySelector(`input[name="kelas_${nisn}"]`).value;
         const jurusan = form.querySelector(`input[name="jurusan_${nisn}"]`).value;
         const dateInput = form.querySelector('input[name="date"]').value;
 
-        // Logic: Jika Hadir/Alpha, kosongkan keterangan sebelum dikirim
+        // Logic: Jika Hadir/Alpha, set default strip
         if (status === 'Hadir' || status === 'Alpha') {
             keterangan = '-'; 
         } else if (keterangan === '') {
@@ -3113,25 +3118,30 @@
         if (result && result.status === 'success') {
             showModal('Penyimpanan Berhasil', `Absensi ${nama} berhasil diperbarui.`, 'success', 3000);
             
-            // Re-load the list to update the 'updated_at' time if needed
+            // Re-load list tanpa reset tab
             const loadForm = document.getElementById('manual-attendance-form');
             if (loadForm) {
-                 // FIX: Tambahkan delay 50ms untuk sinkronisasi data Apps Script
                  setTimeout(() => loadForm.dispatchEvent(new Event('submit')), 50); 
-            } else {
-                 selectTab('absensi-siswa'); 
             }
-
         } else {
-            showModal('Penyimpanan Gagal', result ? result.message : 'Terjadi kesalahan saat menyimpan data absensi tunggal.', 'error', 5000);
+            showModal('Penyimpanan Gagal', result ? result.message : 'Gagal menyimpan data.', 'error', 5000);
         }
     }
 
-
-    async function handleSubmitManualAttendance(e) {
-        if(e) e.preventDefault();
+async function handleSubmitManualAttendance(e) {
+        // Mencegah perilaku default browser (refresh)
+        if(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
         
-        const form = e.target;
+        // PERBAIKAN UTAMA: Ambil elemen form berdasarkan ID, BUKAN dari e.target
+        const form = document.getElementById('manual-attendance-submit-form');
+        if (!form) {
+            console.error("Form tidak ditemukan!");
+            return;
+        }
+
         const nisnInputs = form.querySelectorAll('input[name="nisn"]');
         const dateInput = form.querySelector('input[name="date"]').value;
         const updates = [];
@@ -3140,20 +3150,23 @@
         
         nisnInputs.forEach(input => {
             const nisn = input.value;
-            const status = form.querySelector(`select[name="status_${nisn}"]`).value;
+            // Gunakan optional chaining (?.) untuk keamanan jika elemen null
+            const statusSelect = form.querySelector(`select[name="status_${nisn}"]`);
             const keteranganInput = form.querySelector(`textarea[name="keterangan_${nisn}"]`);
             
-            // Perbaikan: Pastikan kita mengambil nilai yang benar (bukan hanya status disabled)
-            let keterangan = keteranganInput.value.trim();
+            if (!statusSelect) return; // Skip jika error
+
+            const status = statusSelect.value;
             
-            // Logic perbaikan bug: Jika Hadir/Alpha, kosongkan keterangan sebelum dikirim
+            // Perbaikan: Pastikan kita mengambil nilai yang benar
+            let keterangan = keteranganInput ? keteranganInput.value.trim() : '-';
+            
+            // Logic: Jika Hadir/Alpha, kosongkan keterangan sebelum dikirim
             if (status === 'Hadir' || status === 'Alpha') {
                 keterangan = '-'; 
             } else if (keterangan === '') {
-                // Wajib isi jika Izin/Sakit, tapi jika kosong, berikan feedback di Apps Script
                 keterangan = '-'; 
             }
-
 
             const nama = form.querySelector(`input[name="nama_${nisn}"]`).value;
             const kelas = form.querySelector(`input[name="kelas_${nisn}"]`).value;
@@ -3168,7 +3181,10 @@
             });
         });
         
-        if (updates.length === 0) return;
+        if (updates.length === 0) {
+            showModal('Peringatan', 'Tidak ada data siswa ditemukan untuk disimpan.', 'error', 3000);
+            return;
+        }
         
         showModal('Mengirim Data', 'Menyimpan absensi manual massal...', 'loading', 0);
 
@@ -3184,17 +3200,14 @@
         if (result && result.status === 'success') {
             showModal('Penyimpanan Berhasil', 'Absensi massal berhasil diperbarui.', 'success', 3000);
             
-            // Refresh list after save
+            // Refresh list after save tanpa me-reset tab (Mencegah kick-out)
             const loadForm = document.getElementById('manual-attendance-form');
             if (loadForm) {
-                 // FIX: Tambahkan delay 50ms untuk sinkronisasi data Apps Script
                  setTimeout(() => loadForm.dispatchEvent(new Event('submit')), 50); 
-            } else {
-                 selectTab('absensi-siswa'); 
-            }
-
+            } 
+            // Kita HAPUS bagian 'else { selectTab... }' agar tidak me-reset halaman jika terjadi glitch
         } else {
-            showModal('Penyimpanan Gagal', result ? result.message : 'Terjadi kesalahan saat menyimpan data absensi massal. Pastikan fungsi Apps Script sudah di-redeploy.', 'error', 5000);
+            showModal('Penyimpanan Gagal', result ? result.message : 'Terjadi kesalahan saat menyimpan data.', 'error', 5000);
         }
     }
     
@@ -3926,4 +3939,5 @@
 </script>
 </body>
 </html>
+
 
