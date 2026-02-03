@@ -1990,9 +1990,9 @@
                                     </tbody>
                                 </table>
                             </div>
-                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
-                                <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Absensi Massal
-                            </button>
+                           <button type="button" onclick="handleSubmitManualAttendance(event)" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow-xl transform hover:scale-[1.01] transition duration-200 modern-hover print-hidden">
+                             <span data-lucide="save" class="w-5 h-5 mr-2"></span> Simpan Absensi Massal
+                           </button>
                             </form>
             </div>
         `;
@@ -2914,7 +2914,7 @@
         if (!loadForm || !submitForm) return;
         
         loadForm.addEventListener('submit', handleLoadStudentList);
-        submitForm.addEventListener('submit', handleSubmitManualAttendance);
+       
         
         const tableBody = document.getElementById('student-list-body');
         tableBody.removeEventListener('change', handleAttendanceStatusChange);
@@ -3129,7 +3129,7 @@
 
 
     async function handleSubmitManualAttendance(e) {
-        e.preventDefault();
+        if(e) e.preventDefault();
         
         const form = e.target;
         const nisnInputs = form.querySelectorAll('input[name="nisn"]');
@@ -3926,3 +3926,4 @@
 </script>
 </body>
 </html>
+
